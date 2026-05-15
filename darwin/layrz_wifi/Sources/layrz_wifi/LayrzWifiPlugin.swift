@@ -1,8 +1,6 @@
 #if os(iOS)
   import Flutter
   import UIKit
-  import NetworkExtension
-  import SystemConfiguration.CaptiveNetwork
 #elseif os(macOS)
   import FlutterMacOS
   import CoreWLAN
@@ -34,24 +32,17 @@ public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi, CLLocationM
     #endif
   }
 
-  func hasCurrentSsid() throws -> Bool { true }
+  func hasCurrentSsid() throws -> Bool {
+    #if os(iOS)
+      return false
+    #else
+      return true
+    #endif
+  }
 
   func currentSsid() throws -> String? {
     #if os(iOS)
-      if #available(iOS 14.0, *) {
-        var result: String? = nil
-        let semaphore = DispatchSemaphore(value: 0)
-        DispatchQueue.global(qos: .userInitiated).async {
-          NEHotspotNetwork.fetchCurrent { network in
-            result = network?.ssid
-            semaphore.signal()
-          }
-        }
-        semaphore.wait()
-        return result
-      } else {
-        return legacyCopyCurrentSsid()
-      }
+      return nil
     #elseif os(macOS)
       return CWWiFiClient.shared().interface()?.ssid()
     #endif
@@ -178,19 +169,6 @@ public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi, CLLocationM
     } else {
       return .unknown
     }
-  }
-  #endif
-
-  #if os(iOS)
-  private func legacyCopyCurrentSsid() -> String? {
-    guard let interfaces = CNCopySupportedInterfaces() as? [String] else { return nil }
-    for interface in interfaces {
-      if let info = CNCopyCurrentNetworkInfo(interface as CFString) as NSDictionary?,
-         let ssid = info[kCNNetworkInfoKeySSID as String] as? String {
-        return ssid
-      }
-    }
-    return nil
   }
   #endif
 
