@@ -1,5 +1,10 @@
 # layrz_wifi
 
+[![Pub version](https://img.shields.io/pub/v/layrz_wifi?logo=flutter)](https://pub.dev/packages/layrz_wifi)
+[![Pub Points](https://img.shields.io/pub/points/layrz_wifi)](https://pub.dev/packages/layrz_wifi/score)
+[![likes](https://img.shields.io/pub/likes/layrz_wifi?logo=flutter)](https://pub.dev/packages/layrz_wifi/score)
+[![GitHub license](https://img.shields.io/github/license/goldenm-software/layrz_wifi?logo=github)](https://github.com/goldenm-software/layrz_wifi)
+
 A Flutter plugin to scan nearby WiFi networks and read the currently connected SSID on Android, macOS, Windows, and Linux.
 
 All platform communication uses [Pigeon](https://pub.dev/packages/pigeon) for type-safe, generated channel code.
@@ -169,6 +174,25 @@ dart run pigeon --input pigeons/messages.dart
 
 The Swift output goes to `darwin/layrz_wifi/Sources/layrz_wifi/Messages.g.swift` — no manual copying needed.
 
-## License
+## FAQ
 
-MIT — see [LICENSE](LICENSE).
+### Why is this package called `layrz_wifi`?
+All packages developed by [Layrz](https://layrz.com) are prefixed with `layrz_`, check out our other packages on [pub.dev](https://pub.dev/publishers/goldenm.com/packages).
+
+### I need to pay to use this package?
+<b>No!</b> This library is free and open source, you can use it in your projects without any cost, but if you want to support us, give us a thumbs up here in [pub.dev](https://pub.dev/packages/layrz_wifi) and star our [Repository](https://github.com/goldenm-software/layrz_wifi)!
+
+### Can I contribute to this package?
+<b>Yes!</b> We are open to contributions, feel free to open a pull request or an issue on the [Repository](https://github.com/goldenm-software/layrz_wifi)!
+
+### I have a question, how can I contact you?
+If you need more assistance, you open an issue on the [Repository](https://github.com/goldenm-software/layrz_wifi) and we're happy to help you :)
+
+## License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+This project is maintained by [Golden M](https://goldenm.com) with authorization of [Layrz LTD](https://layrz.com).
+
+## Who are you? / Want to work with us?
+
+<b>Golden M</b> is a software and hardware development company what is working on a new, innovative and disruptive technologies. For more information, contact us at [sales@goldenm.com](mailto:sales@goldenm.com) or via WhatsApp at [+(507)-6979-3073](https://wa.me/50769793073?text="From%20layrz_wifi%20flutter%20library.%20Hello").
