@@ -193,7 +193,8 @@ protocol LayrzWifiApi {
   func currentSsid() throws -> String?
   func startScan() throws
   func stopScan() throws
-  func ensurePermissions() throws -> WifiPermissionStatus
+  func requestPermissions() throws -> Bool
+  func permissionStatus() throws -> WifiPermissionStatus
 }
 
 /// Generated setup class from Pigeon to handle messages through the `binaryMessenger`.
@@ -267,18 +268,31 @@ class LayrzWifiApiSetup {
     } else {
       stopScanChannel.setMessageHandler(nil)
     }
-    let ensurePermissionsChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.layrz_wifi.LayrzWifiApi.ensurePermissions\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    let requestPermissionsChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.layrz_wifi.LayrzWifiApi.requestPermissions\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
     if let api = api {
-      ensurePermissionsChannel.setMessageHandler { _, reply in
+      requestPermissionsChannel.setMessageHandler { _, reply in
         do {
-          let result = try api.ensurePermissions()
+          let result = try api.requestPermissions()
           reply(wrapResult(result))
         } catch {
           reply(wrapError(error))
         }
       }
     } else {
-      ensurePermissionsChannel.setMessageHandler(nil)
+      requestPermissionsChannel.setMessageHandler(nil)
+    }
+    let permissionStatusChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.layrz_wifi.LayrzWifiApi.permissionStatus\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      permissionStatusChannel.setMessageHandler { _, reply in
+        do {
+          let result = try api.permissionStatus()
+          reply(wrapResult(result))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      permissionStatusChannel.setMessageHandler(nil)
     }
   }
 }
