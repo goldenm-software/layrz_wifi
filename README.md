@@ -1,6 +1,6 @@
 # layrz_wifi
 
-> ⚠️ **Vibe coded plugin** — generated with AI assistance. Review native platform code carefully before using in production.
+> 🤖 Generated using AI Assistance, you may find optimizations along the plugin, feel free to open a Pull Request.
 
 A Flutter plugin to scan nearby WiFi networks and read the currently connected SSID on Android, iOS, macOS, Windows, Linux, and Web.
 
