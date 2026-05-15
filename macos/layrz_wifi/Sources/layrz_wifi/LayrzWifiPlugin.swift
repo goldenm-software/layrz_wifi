@@ -75,7 +75,7 @@ public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
     case .restricted:
       return .restricted
     case .notDetermined:
-      // Don't request here — the app layer (permission_handler) owns the prompt.
+      manager.requestAlwaysAuthorization()
       return .denied
     @unknown default:
       return .denied

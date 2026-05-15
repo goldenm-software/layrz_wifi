@@ -79,20 +79,15 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
   /// Requests the platform permission needed for Wi-Fi scanning.
   /// Returns true if the app may proceed with scanning.
   Future<bool> _requestPermission() async {
-    // Linux and Windows don't need runtime permission grants.
-    if (Platform.isLinux || Platform.isWindows) return true;
+    // Linux, Windows and macOS: delegate entirely to the plugin's ensurePermissions()
+    // (which calls CLLocationManager on Apple, notRequired on others).
+    if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) return true;
 
-    final Permission permission;
-    if (Platform.isAndroid) {
-      permission = await Permission.nearbyWifiDevices.isGranted
-          ? Permission.nearbyWifiDevices
-          : Permission.location;
-    } else if (Platform.isMacOS) {
-      permission = Permission.locationWhenInUse;
-    } else {
-      // iOS
-      permission = Permission.locationWhenInUse;
-    }
+    final Permission permission = Platform.isAndroid
+        ? (await Permission.nearbyWifiDevices.isGranted
+            ? Permission.nearbyWifiDevices
+            : Permission.location)
+        : Permission.locationWhenInUse;
 
     var status = await permission.status;
 
