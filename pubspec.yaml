@@ -30,8 +30,10 @@ flutter:
         pluginClass: LayrzWifiPlugin
       ios:
         pluginClass: LayrzWifiPlugin
+        sharedDarwinSource: true
       macos:
         pluginClass: LayrzWifiPlugin
+        sharedDarwinSource: true
       windows:
         pluginClass: LayrzWifiPluginCApi
       linux:
