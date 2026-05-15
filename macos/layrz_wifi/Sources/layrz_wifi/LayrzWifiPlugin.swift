@@ -2,7 +2,7 @@ import FlutterMacOS
 import CoreWLAN
 import CoreLocation
 
-public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
+public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi, CLLocationManagerDelegate {
     var events: LayrzWifiEvents?
     var locationManager: CLLocationManager?
 
@@ -11,9 +11,8 @@ public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
         plugin.events = LayrzWifiEvents(binaryMessenger: registrar.messenger)
         LayrzWifiApiSetup.setUp(binaryMessenger: registrar.messenger, api: plugin)
 
-        locationManager = CLLocationManager()
-        locationManager?.delegate = self
-        locationManager?.requestWhenInUseAuthorization()
+        plugin.locationManager = CLLocationManager()
+        plugin.locationManager?.delegate = plugin
     }
 
   func hasDiscovery() throws -> Bool { true }
@@ -72,7 +71,7 @@ public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
   func stopScan() throws {}
 
   func ensurePermissions() throws -> WifiPermissionStatus {
-    let manager = CLLocationManager()
+    let manager = locationManager ?? CLLocationManager()
     let status: CLAuthorizationStatus
     if #available(macOS 11.0, *) {
       status = manager.authorizationStatus
@@ -88,8 +87,6 @@ public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
       return .restricted
     case .notDetermined:
       manager.requestAlwaysAuthorization()
-      // Return notRequired so the caller proceeds; scanForNetworks will enforce
-      // the grant itself once the async dialog resolves.
       return .notRequired
     @unknown default:
       return .denied
@@ -112,6 +109,8 @@ public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
     }
   }
     
+    public func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {}
+
     private func log(_ message: String) {
         NSLog("[LayrzWifiPlugin/macOS]: \(message)")
     }
