@@ -173,7 +173,7 @@ std::optional<FlutterError> LayrzWifiPlugin::StartScan() {
         network.set_signal_dbm(static_cast<int64_t>(net.wlanSignalQuality));
 
         // Post OnScanResult to the Flutter UI thread
-        registrar_->GetTaskRunner()->PostTask([this, network]() {
+        ui_thread_->Post([this, network]() {
           events_->OnScanResult(network,
                                 []() {},
                                 [](const FlutterError&) {});
