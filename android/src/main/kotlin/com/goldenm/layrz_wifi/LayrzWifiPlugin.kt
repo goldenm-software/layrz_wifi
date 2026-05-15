@@ -9,16 +9,17 @@ import android.content.pm.PackageManager
 import android.net.wifi.WifiManager
 import android.net.wifi.WifiInfo
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import androidx.core.app.ActivityCompat
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.PluginRegistry
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class LayrzWifiPlugin : FlutterPlugin, ActivityAware, LayrzWifiApi,
     PluginRegistry.RequestPermissionsResultListener {
@@ -26,6 +27,10 @@ class LayrzWifiPlugin : FlutterPlugin, ActivityAware, LayrzWifiApi,
   private lateinit var context: Context
   private var activityBinding: ActivityPluginBinding? = null
   private var permissionResult: ((WifiPermissionStatus) -> Unit)? = null
+  private var events: LayrzWifiEvents? = null
+  private var scanReceiver: BroadcastReceiver? = null
+  private var scanCancelled = false
+  private val mainHandler = Handler(Looper.getMainLooper())
 
   companion object {
     private const val PERMISSION_REQUEST_CODE = 0x4E57
@@ -33,6 +38,7 @@ class LayrzWifiPlugin : FlutterPlugin, ActivityAware, LayrzWifiApi,
 
   override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
     context = binding.applicationContext
+    events = LayrzWifiEvents(binding.binaryMessenger)
     LayrzWifiApi.setUp(binding.binaryMessenger, this)
   }
 
@@ -71,19 +77,107 @@ class LayrzWifiPlugin : FlutterPlugin, ActivityAware, LayrzWifiApi,
     return if (ssid == "<unknown ssid>" || ssid.isEmpty()) null else ssid.removeSurrounding("\"")
   }
 
-  override fun scan(): List<WifiNetwork> {
-    val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-    wifiManager.startScan()
-    val results = wifiManager.scanResults ?: return emptyList()
-    return results.map { result ->
-      WifiNetwork(
-        ssid = result.SSID ?: "",
-        bssid = result.BSSID,
-        signalDbm = result.level.toLong(),
-        frequencyMhz = result.frequency.toLong(),
-        security = parseSecurity(result.capabilities),
-        isHidden = result.SSID.isNullOrEmpty(),
-      )
+  override fun startScan() {
+    scanCancelled = false
+    CoroutineScope(Dispatchers.IO).launch {
+      try {
+        val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+
+        val receiver = object : BroadcastReceiver() {
+          override fun onReceive(context: Context, intent: Intent) {
+            if (scanCancelled) return
+
+            try {
+              val results = wifiManager.scanResults ?: emptyList()
+
+              // Post each network on the main thread
+              for (result in results) {
+                if (scanCancelled) break
+
+                val network = WifiNetwork(
+                  ssid = result.SSID ?: "",
+                  bssid = result.BSSID,
+                  signalDbm = result.level.toLong(),
+                  frequencyMhz = result.frequency.toLong(),
+                  security = parseSecurity(result.capabilities),
+                  isHidden = result.SSID.isNullOrEmpty(),
+                )
+
+                mainHandler.post {
+                  events?.onScanResult(network) { result ->
+                    result.onFailure { e ->
+                      android.util.Log.e("LayrzWifiPlugin", "Error posting scan result", e)
+                    }
+                  }
+                }
+              }
+
+              // Post scan complete on the main thread
+              if (!scanCancelled) {
+                mainHandler.post {
+                  events?.onScanComplete { result ->
+                    result.onFailure { e ->
+                      android.util.Log.e("LayrzWifiPlugin", "Error posting scan complete", e)
+                    }
+                  }
+                }
+              }
+            } catch (e: Exception) {
+              mainHandler.post {
+                events?.onScanError("Scan error: ${e.message}") { result ->
+                  result.onFailure { ex ->
+                    android.util.Log.e("LayrzWifiPlugin", "Error posting scan error", ex)
+                  }
+                }
+              }
+            }
+
+            // Unregister the receiver
+            try {
+              context.unregisterReceiver(this)
+              scanReceiver = null
+            } catch (e: Exception) {
+              android.util.Log.e("LayrzWifiPlugin", "Error unregistering receiver", e)
+            }
+          }
+        }
+
+        scanReceiver = receiver
+        val filter = IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
+        context.registerReceiver(receiver, filter)
+
+        // Trigger the scan
+        wifiManager.startScan()
+      } catch (e: Exception) {
+        mainHandler.post {
+          events?.onScanError("Failed to start scan: ${e.message}") { result ->
+            result.onFailure { ex ->
+              android.util.Log.e("LayrzWifiPlugin", "Error posting scan error", ex)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  override fun stopScan() {
+    scanCancelled = true
+
+    if (scanReceiver != null) {
+      try {
+        context.unregisterReceiver(scanReceiver!!)
+        scanReceiver = null
+      } catch (e: Exception) {
+        android.util.Log.e("LayrzWifiPlugin", "Error unregistering receiver", e)
+      }
+    }
+
+    mainHandler.post {
+      events?.onScanComplete { result ->
+        result.onFailure { e ->
+          android.util.Log.e("LayrzWifiPlugin", "Error posting scan complete on stop", e)
+        }
+      }
     }
   }
 
