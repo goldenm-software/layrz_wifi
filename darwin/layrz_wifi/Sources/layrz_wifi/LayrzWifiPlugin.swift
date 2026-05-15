@@ -94,7 +94,7 @@ public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi, CLLocationM
             }
           }
 
-          DispatchQueue.main.async {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
             self.events?.onScanComplete { _ in }
           }
         } catch {
