@@ -4,10 +4,10 @@ import CoreLocation
 import NetworkExtension
 import SystemConfiguration.CaptiveNetwork
 
-class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
+public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
   var events: LayrzWifiEvents?
 
-  static func register(with registrar: FlutterPluginRegistrar) {
+  public static func register(with registrar: FlutterPluginRegistrar) {
     let plugin = LayrzWifiPlugin()
     plugin.events = LayrzWifiEvents(binaryMessenger: registrar.messenger())
     LayrzWifiApiSetup.setUp(binaryMessenger: registrar.messenger(), api: plugin)

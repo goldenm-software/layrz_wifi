@@ -2,10 +2,10 @@ import FlutterMacOS
 import CoreWLAN
 import CoreLocation
 
-class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
+public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
   var events: LayrzWifiEvents?
 
-  static func register(with registrar: FlutterPluginRegistrar) {
+  public static func register(with registrar: FlutterPluginRegistrar) {
     let plugin = LayrzWifiPlugin()
     plugin.events = LayrzWifiEvents(binaryMessenger: registrar.messenger)
     LayrzWifiApiSetup.setUp(binaryMessenger: registrar.messenger, api: plugin)
@@ -57,13 +57,16 @@ class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
     }
   }
 
-  func stopScan() throws {
-    // CoreWLAN scan cannot be cancelled mid-call; the existing scan will complete
-    // and fire onScanComplete naturally. This is a no-op.
-  }
+  func stopScan() throws {}
 
   func ensurePermissions() throws -> WifiPermissionStatus {
-    let status = CLLocationManager.authorizationStatus()
+    let manager = CLLocationManager()
+    let status: CLAuthorizationStatus
+    if #available(macOS 11.0, *) {
+      status = manager.authorizationStatus
+    } else {
+      status = CLLocationManager.authorizationStatus()
+    }
     switch status {
     case .authorizedAlways:
       return .granted
@@ -72,7 +75,7 @@ class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
     case .restricted:
       return .restricted
     case .notDetermined:
-      CLLocationManager().requestAlwaysAuthorization()
+      manager.requestAlwaysAuthorization()
       return .denied
     @unknown default:
       return .denied
