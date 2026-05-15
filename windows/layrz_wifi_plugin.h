@@ -24,7 +24,8 @@ class LayrzWifiPlugin : public flutter::Plugin, public LayrzWifiApi {
   ErrorOr<std::optional<std::string>> CurrentSsid() override;
   std::optional<FlutterError> StartScan() override;
   std::optional<FlutterError> StopScan() override;
-  ErrorOr<WifiPermissionStatus> EnsurePermissions() override;
+  ErrorOr<bool> RequestPermissions() override;
+  ErrorOr<WifiPermissionStatus> PermissionStatus() override;
 
  private:
   std::unique_ptr<LayrzWifiEvents> events_;

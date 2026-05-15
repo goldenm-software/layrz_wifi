@@ -206,7 +206,11 @@ std::optional<FlutterError> LayrzWifiPlugin::StopScan() {
   return std::nullopt;
 }
 
-ErrorOr<WifiPermissionStatus> LayrzWifiPlugin::EnsurePermissions() {
+ErrorOr<bool> LayrzWifiPlugin::RequestPermissions() {
+  return true;
+}
+
+ErrorOr<WifiPermissionStatus> LayrzWifiPlugin::PermissionStatus() {
   return WifiPermissionStatus::kNotRequired;
 }
 

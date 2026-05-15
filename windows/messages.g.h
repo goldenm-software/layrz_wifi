@@ -168,7 +168,8 @@ class LayrzWifiApi {
   virtual ErrorOr<std::optional<std::string>> CurrentSsid() = 0;
   virtual std::optional<FlutterError> StartScan() = 0;
   virtual std::optional<FlutterError> StopScan() = 0;
-  virtual ErrorOr<WifiPermissionStatus> EnsurePermissions() = 0;
+  virtual ErrorOr<bool> RequestPermissions() = 0;
+  virtual ErrorOr<WifiPermissionStatus> PermissionStatus() = 0;
 
   // The codec used by LayrzWifiApi.
   static const flutter::StandardMessageCodec& GetCodec();
