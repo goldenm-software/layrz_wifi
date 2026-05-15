@@ -252,28 +252,51 @@ LayrzWifiLayrzWifiApiStopScanResponse* layrz_wifi_layrz_wifi_api_stop_scan_respo
  */
 LayrzWifiLayrzWifiApiStopScanResponse* layrz_wifi_layrz_wifi_api_stop_scan_response_new_error(const gchar* code, const gchar* message, FlValue* details);
 
-G_DECLARE_FINAL_TYPE(LayrzWifiLayrzWifiApiEnsurePermissionsResponse, layrz_wifi_layrz_wifi_api_ensure_permissions_response, LAYRZ_WIFI, LAYRZ_WIFI_API_ENSURE_PERMISSIONS_RESPONSE, GObject)
+G_DECLARE_FINAL_TYPE(LayrzWifiLayrzWifiApiRequestPermissionsResponse, layrz_wifi_layrz_wifi_api_request_permissions_response, LAYRZ_WIFI, LAYRZ_WIFI_API_REQUEST_PERMISSIONS_RESPONSE, GObject)
 
 /**
- * layrz_wifi_layrz_wifi_api_ensure_permissions_response_new:
+ * layrz_wifi_layrz_wifi_api_request_permissions_response_new:
  *
- * Creates a new response to LayrzWifiApi.ensurePermissions.
+ * Creates a new response to LayrzWifiApi.requestPermissions.
  *
- * Returns: a new #LayrzWifiLayrzWifiApiEnsurePermissionsResponse
+ * Returns: a new #LayrzWifiLayrzWifiApiRequestPermissionsResponse
  */
-LayrzWifiLayrzWifiApiEnsurePermissionsResponse* layrz_wifi_layrz_wifi_api_ensure_permissions_response_new(LayrzWifiWifiPermissionStatus return_value);
+LayrzWifiLayrzWifiApiRequestPermissionsResponse* layrz_wifi_layrz_wifi_api_request_permissions_response_new(gboolean return_value);
 
 /**
- * layrz_wifi_layrz_wifi_api_ensure_permissions_response_new_error:
+ * layrz_wifi_layrz_wifi_api_request_permissions_response_new_error:
  * @code: error code.
  * @message: error message.
  * @details: (allow-none): error details or %NULL.
  *
- * Creates a new error response to LayrzWifiApi.ensurePermissions.
+ * Creates a new error response to LayrzWifiApi.requestPermissions.
  *
- * Returns: a new #LayrzWifiLayrzWifiApiEnsurePermissionsResponse
+ * Returns: a new #LayrzWifiLayrzWifiApiRequestPermissionsResponse
  */
-LayrzWifiLayrzWifiApiEnsurePermissionsResponse* layrz_wifi_layrz_wifi_api_ensure_permissions_response_new_error(const gchar* code, const gchar* message, FlValue* details);
+LayrzWifiLayrzWifiApiRequestPermissionsResponse* layrz_wifi_layrz_wifi_api_request_permissions_response_new_error(const gchar* code, const gchar* message, FlValue* details);
+
+G_DECLARE_FINAL_TYPE(LayrzWifiLayrzWifiApiPermissionStatusResponse, layrz_wifi_layrz_wifi_api_permission_status_response, LAYRZ_WIFI, LAYRZ_WIFI_API_PERMISSION_STATUS_RESPONSE, GObject)
+
+/**
+ * layrz_wifi_layrz_wifi_api_permission_status_response_new:
+ *
+ * Creates a new response to LayrzWifiApi.permissionStatus.
+ *
+ * Returns: a new #LayrzWifiLayrzWifiApiPermissionStatusResponse
+ */
+LayrzWifiLayrzWifiApiPermissionStatusResponse* layrz_wifi_layrz_wifi_api_permission_status_response_new(LayrzWifiWifiPermissionStatus return_value);
+
+/**
+ * layrz_wifi_layrz_wifi_api_permission_status_response_new_error:
+ * @code: error code.
+ * @message: error message.
+ * @details: (allow-none): error details or %NULL.
+ *
+ * Creates a new error response to LayrzWifiApi.permissionStatus.
+ *
+ * Returns: a new #LayrzWifiLayrzWifiApiPermissionStatusResponse
+ */
+LayrzWifiLayrzWifiApiPermissionStatusResponse* layrz_wifi_layrz_wifi_api_permission_status_response_new_error(const gchar* code, const gchar* message, FlValue* details);
 
 /**
  * LayrzWifiLayrzWifiApiVTable:
@@ -286,7 +309,8 @@ typedef struct {
   LayrzWifiLayrzWifiApiCurrentSsidResponse* (*current_ssid)(gpointer user_data);
   LayrzWifiLayrzWifiApiStartScanResponse* (*start_scan)(gpointer user_data);
   LayrzWifiLayrzWifiApiStopScanResponse* (*stop_scan)(gpointer user_data);
-  LayrzWifiLayrzWifiApiEnsurePermissionsResponse* (*ensure_permissions)(gpointer user_data);
+  LayrzWifiLayrzWifiApiRequestPermissionsResponse* (*request_permissions)(gpointer user_data);
+  LayrzWifiLayrzWifiApiPermissionStatusResponse* (*permission_status)(gpointer user_data);
 } LayrzWifiLayrzWifiApiVTable;
 
 /**

@@ -412,36 +412,73 @@ LayrzWifiLayrzWifiApiStopScanResponse* layrz_wifi_layrz_wifi_api_stop_scan_respo
   return self;
 }
 
-struct _LayrzWifiLayrzWifiApiEnsurePermissionsResponse {
+struct _LayrzWifiLayrzWifiApiRequestPermissionsResponse {
   GObject parent_instance;
 
   FlValue* value;
 };
 
-G_DEFINE_TYPE(LayrzWifiLayrzWifiApiEnsurePermissionsResponse, layrz_wifi_layrz_wifi_api_ensure_permissions_response, G_TYPE_OBJECT)
+G_DEFINE_TYPE(LayrzWifiLayrzWifiApiRequestPermissionsResponse, layrz_wifi_layrz_wifi_api_request_permissions_response, G_TYPE_OBJECT)
 
-static void layrz_wifi_layrz_wifi_api_ensure_permissions_response_dispose(GObject* object) {
-  LayrzWifiLayrzWifiApiEnsurePermissionsResponse* self = LAYRZ_WIFI_LAYRZ_WIFI_API_ENSURE_PERMISSIONS_RESPONSE(object);
+static void layrz_wifi_layrz_wifi_api_request_permissions_response_dispose(GObject* object) {
+  LayrzWifiLayrzWifiApiRequestPermissionsResponse* self = LAYRZ_WIFI_LAYRZ_WIFI_API_REQUEST_PERMISSIONS_RESPONSE(object);
   g_clear_pointer(&self->value, fl_value_unref);
-  G_OBJECT_CLASS(layrz_wifi_layrz_wifi_api_ensure_permissions_response_parent_class)->dispose(object);
+  G_OBJECT_CLASS(layrz_wifi_layrz_wifi_api_request_permissions_response_parent_class)->dispose(object);
 }
 
-static void layrz_wifi_layrz_wifi_api_ensure_permissions_response_init(LayrzWifiLayrzWifiApiEnsurePermissionsResponse* self) {
+static void layrz_wifi_layrz_wifi_api_request_permissions_response_init(LayrzWifiLayrzWifiApiRequestPermissionsResponse* self) {
 }
 
-static void layrz_wifi_layrz_wifi_api_ensure_permissions_response_class_init(LayrzWifiLayrzWifiApiEnsurePermissionsResponseClass* klass) {
-  G_OBJECT_CLASS(klass)->dispose = layrz_wifi_layrz_wifi_api_ensure_permissions_response_dispose;
+static void layrz_wifi_layrz_wifi_api_request_permissions_response_class_init(LayrzWifiLayrzWifiApiRequestPermissionsResponseClass* klass) {
+  G_OBJECT_CLASS(klass)->dispose = layrz_wifi_layrz_wifi_api_request_permissions_response_dispose;
 }
 
-LayrzWifiLayrzWifiApiEnsurePermissionsResponse* layrz_wifi_layrz_wifi_api_ensure_permissions_response_new(LayrzWifiWifiPermissionStatus return_value) {
-  LayrzWifiLayrzWifiApiEnsurePermissionsResponse* self = LAYRZ_WIFI_LAYRZ_WIFI_API_ENSURE_PERMISSIONS_RESPONSE(g_object_new(layrz_wifi_layrz_wifi_api_ensure_permissions_response_get_type(), nullptr));
+LayrzWifiLayrzWifiApiRequestPermissionsResponse* layrz_wifi_layrz_wifi_api_request_permissions_response_new(gboolean return_value) {
+  LayrzWifiLayrzWifiApiRequestPermissionsResponse* self = LAYRZ_WIFI_LAYRZ_WIFI_API_REQUEST_PERMISSIONS_RESPONSE(g_object_new(layrz_wifi_layrz_wifi_api_request_permissions_response_get_type(), nullptr));
+  self->value = fl_value_new_list();
+  fl_value_append_take(self->value, fl_value_new_bool(return_value));
+  return self;
+}
+
+LayrzWifiLayrzWifiApiRequestPermissionsResponse* layrz_wifi_layrz_wifi_api_request_permissions_response_new_error(const gchar* code, const gchar* message, FlValue* details) {
+  LayrzWifiLayrzWifiApiRequestPermissionsResponse* self = LAYRZ_WIFI_LAYRZ_WIFI_API_REQUEST_PERMISSIONS_RESPONSE(g_object_new(layrz_wifi_layrz_wifi_api_request_permissions_response_get_type(), nullptr));
+  self->value = fl_value_new_list();
+  fl_value_append_take(self->value, fl_value_new_string(code));
+  fl_value_append_take(self->value, fl_value_new_string(message != nullptr ? message : ""));
+  fl_value_append_take(self->value, details != nullptr ? fl_value_ref(details) : fl_value_new_null());
+  return self;
+}
+
+struct _LayrzWifiLayrzWifiApiPermissionStatusResponse {
+  GObject parent_instance;
+
+  FlValue* value;
+};
+
+G_DEFINE_TYPE(LayrzWifiLayrzWifiApiPermissionStatusResponse, layrz_wifi_layrz_wifi_api_permission_status_response, G_TYPE_OBJECT)
+
+static void layrz_wifi_layrz_wifi_api_permission_status_response_dispose(GObject* object) {
+  LayrzWifiLayrzWifiApiPermissionStatusResponse* self = LAYRZ_WIFI_LAYRZ_WIFI_API_PERMISSION_STATUS_RESPONSE(object);
+  g_clear_pointer(&self->value, fl_value_unref);
+  G_OBJECT_CLASS(layrz_wifi_layrz_wifi_api_permission_status_response_parent_class)->dispose(object);
+}
+
+static void layrz_wifi_layrz_wifi_api_permission_status_response_init(LayrzWifiLayrzWifiApiPermissionStatusResponse* self) {
+}
+
+static void layrz_wifi_layrz_wifi_api_permission_status_response_class_init(LayrzWifiLayrzWifiApiPermissionStatusResponseClass* klass) {
+  G_OBJECT_CLASS(klass)->dispose = layrz_wifi_layrz_wifi_api_permission_status_response_dispose;
+}
+
+LayrzWifiLayrzWifiApiPermissionStatusResponse* layrz_wifi_layrz_wifi_api_permission_status_response_new(LayrzWifiWifiPermissionStatus return_value) {
+  LayrzWifiLayrzWifiApiPermissionStatusResponse* self = LAYRZ_WIFI_LAYRZ_WIFI_API_PERMISSION_STATUS_RESPONSE(g_object_new(layrz_wifi_layrz_wifi_api_permission_status_response_get_type(), nullptr));
   self->value = fl_value_new_list();
   fl_value_append_take(self->value, fl_value_new_custom(130, fl_value_new_int(return_value), (GDestroyNotify)fl_value_unref));
   return self;
 }
 
-LayrzWifiLayrzWifiApiEnsurePermissionsResponse* layrz_wifi_layrz_wifi_api_ensure_permissions_response_new_error(const gchar* code, const gchar* message, FlValue* details) {
-  LayrzWifiLayrzWifiApiEnsurePermissionsResponse* self = LAYRZ_WIFI_LAYRZ_WIFI_API_ENSURE_PERMISSIONS_RESPONSE(g_object_new(layrz_wifi_layrz_wifi_api_ensure_permissions_response_get_type(), nullptr));
+LayrzWifiLayrzWifiApiPermissionStatusResponse* layrz_wifi_layrz_wifi_api_permission_status_response_new_error(const gchar* code, const gchar* message, FlValue* details) {
+  LayrzWifiLayrzWifiApiPermissionStatusResponse* self = LAYRZ_WIFI_LAYRZ_WIFI_API_PERMISSION_STATUS_RESPONSE(g_object_new(layrz_wifi_layrz_wifi_api_permission_status_response_get_type(), nullptr));
   self->value = fl_value_new_list();
   fl_value_append_take(self->value, fl_value_new_string(code));
   fl_value_append_take(self->value, fl_value_new_string(message != nullptr ? message : ""));
@@ -578,22 +615,41 @@ static void layrz_wifi_layrz_wifi_api_stop_scan_cb(FlBasicMessageChannel* channe
   }
 }
 
-static void layrz_wifi_layrz_wifi_api_ensure_permissions_cb(FlBasicMessageChannel* channel, FlValue* message_, FlBasicMessageChannelResponseHandle* response_handle, gpointer user_data) {
+static void layrz_wifi_layrz_wifi_api_request_permissions_cb(FlBasicMessageChannel* channel, FlValue* message_, FlBasicMessageChannelResponseHandle* response_handle, gpointer user_data) {
   LayrzWifiLayrzWifiApi* self = LAYRZ_WIFI_LAYRZ_WIFI_API(user_data);
 
-  if (self->vtable == nullptr || self->vtable->ensure_permissions == nullptr) {
+  if (self->vtable == nullptr || self->vtable->request_permissions == nullptr) {
     return;
   }
 
-  g_autoptr(LayrzWifiLayrzWifiApiEnsurePermissionsResponse) response = self->vtable->ensure_permissions(self->user_data);
+  g_autoptr(LayrzWifiLayrzWifiApiRequestPermissionsResponse) response = self->vtable->request_permissions(self->user_data);
   if (response == nullptr) {
-    g_warning("No response returned to %s.%s", "LayrzWifiApi", "ensurePermissions");
+    g_warning("No response returned to %s.%s", "LayrzWifiApi", "requestPermissions");
     return;
   }
 
   g_autoptr(GError) error = NULL;
   if (!fl_basic_message_channel_respond(channel, response_handle, response->value, &error)) {
-    g_warning("Failed to send response to %s.%s: %s", "LayrzWifiApi", "ensurePermissions", error->message);
+    g_warning("Failed to send response to %s.%s: %s", "LayrzWifiApi", "requestPermissions", error->message);
+  }
+}
+
+static void layrz_wifi_layrz_wifi_api_permission_status_cb(FlBasicMessageChannel* channel, FlValue* message_, FlBasicMessageChannelResponseHandle* response_handle, gpointer user_data) {
+  LayrzWifiLayrzWifiApi* self = LAYRZ_WIFI_LAYRZ_WIFI_API(user_data);
+
+  if (self->vtable == nullptr || self->vtable->permission_status == nullptr) {
+    return;
+  }
+
+  g_autoptr(LayrzWifiLayrzWifiApiPermissionStatusResponse) response = self->vtable->permission_status(self->user_data);
+  if (response == nullptr) {
+    g_warning("No response returned to %s.%s", "LayrzWifiApi", "permissionStatus");
+    return;
+  }
+
+  g_autoptr(GError) error = NULL;
+  if (!fl_basic_message_channel_respond(channel, response_handle, response->value, &error)) {
+    g_warning("Failed to send response to %s.%s: %s", "LayrzWifiApi", "permissionStatus", error->message);
   }
 }
 
@@ -617,9 +673,12 @@ void layrz_wifi_layrz_wifi_api_set_method_handlers(FlBinaryMessenger* messenger,
   g_autofree gchar* stop_scan_channel_name = g_strdup_printf("dev.flutter.pigeon.layrz_wifi.LayrzWifiApi.stopScan%s", dot_suffix);
   g_autoptr(FlBasicMessageChannel) stop_scan_channel = fl_basic_message_channel_new(messenger, stop_scan_channel_name, FL_MESSAGE_CODEC(codec));
   fl_basic_message_channel_set_message_handler(stop_scan_channel, layrz_wifi_layrz_wifi_api_stop_scan_cb, g_object_ref(api_data), g_object_unref);
-  g_autofree gchar* ensure_permissions_channel_name = g_strdup_printf("dev.flutter.pigeon.layrz_wifi.LayrzWifiApi.ensurePermissions%s", dot_suffix);
-  g_autoptr(FlBasicMessageChannel) ensure_permissions_channel = fl_basic_message_channel_new(messenger, ensure_permissions_channel_name, FL_MESSAGE_CODEC(codec));
-  fl_basic_message_channel_set_message_handler(ensure_permissions_channel, layrz_wifi_layrz_wifi_api_ensure_permissions_cb, g_object_ref(api_data), g_object_unref);
+  g_autofree gchar* request_permissions_channel_name = g_strdup_printf("dev.flutter.pigeon.layrz_wifi.LayrzWifiApi.requestPermissions%s", dot_suffix);
+  g_autoptr(FlBasicMessageChannel) request_permissions_channel = fl_basic_message_channel_new(messenger, request_permissions_channel_name, FL_MESSAGE_CODEC(codec));
+  fl_basic_message_channel_set_message_handler(request_permissions_channel, layrz_wifi_layrz_wifi_api_request_permissions_cb, g_object_ref(api_data), g_object_unref);
+  g_autofree gchar* permission_status_channel_name = g_strdup_printf("dev.flutter.pigeon.layrz_wifi.LayrzWifiApi.permissionStatus%s", dot_suffix);
+  g_autoptr(FlBasicMessageChannel) permission_status_channel = fl_basic_message_channel_new(messenger, permission_status_channel_name, FL_MESSAGE_CODEC(codec));
+  fl_basic_message_channel_set_message_handler(permission_status_channel, layrz_wifi_layrz_wifi_api_permission_status_cb, g_object_ref(api_data), g_object_unref);
 }
 
 void layrz_wifi_layrz_wifi_api_clear_method_handlers(FlBinaryMessenger* messenger, const gchar* suffix) {
@@ -641,9 +700,12 @@ void layrz_wifi_layrz_wifi_api_clear_method_handlers(FlBinaryMessenger* messenge
   g_autofree gchar* stop_scan_channel_name = g_strdup_printf("dev.flutter.pigeon.layrz_wifi.LayrzWifiApi.stopScan%s", dot_suffix);
   g_autoptr(FlBasicMessageChannel) stop_scan_channel = fl_basic_message_channel_new(messenger, stop_scan_channel_name, FL_MESSAGE_CODEC(codec));
   fl_basic_message_channel_set_message_handler(stop_scan_channel, nullptr, nullptr, nullptr);
-  g_autofree gchar* ensure_permissions_channel_name = g_strdup_printf("dev.flutter.pigeon.layrz_wifi.LayrzWifiApi.ensurePermissions%s", dot_suffix);
-  g_autoptr(FlBasicMessageChannel) ensure_permissions_channel = fl_basic_message_channel_new(messenger, ensure_permissions_channel_name, FL_MESSAGE_CODEC(codec));
-  fl_basic_message_channel_set_message_handler(ensure_permissions_channel, nullptr, nullptr, nullptr);
+  g_autofree gchar* request_permissions_channel_name = g_strdup_printf("dev.flutter.pigeon.layrz_wifi.LayrzWifiApi.requestPermissions%s", dot_suffix);
+  g_autoptr(FlBasicMessageChannel) request_permissions_channel = fl_basic_message_channel_new(messenger, request_permissions_channel_name, FL_MESSAGE_CODEC(codec));
+  fl_basic_message_channel_set_message_handler(request_permissions_channel, nullptr, nullptr, nullptr);
+  g_autofree gchar* permission_status_channel_name = g_strdup_printf("dev.flutter.pigeon.layrz_wifi.LayrzWifiApi.permissionStatus%s", dot_suffix);
+  g_autoptr(FlBasicMessageChannel) permission_status_channel = fl_basic_message_channel_new(messenger, permission_status_channel_name, FL_MESSAGE_CODEC(codec));
+  fl_basic_message_channel_set_message_handler(permission_status_channel, nullptr, nullptr, nullptr);
 }
 
 struct _LayrzWifiLayrzWifiEvents {

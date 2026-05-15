@@ -228,8 +228,12 @@ static LayrzWifiLayrzWifiApiStopScanResponse* handle_stop_scan(gpointer user_dat
   return layrz_wifi_layrz_wifi_api_stop_scan_response_new();
 }
 
-static LayrzWifiLayrzWifiApiEnsurePermissionsResponse* handle_ensure_permissions(gpointer user_data) {
-  return layrz_wifi_layrz_wifi_api_ensure_permissions_response_new(
+static LayrzWifiLayrzWifiApiRequestPermissionsResponse* handle_request_permissions(gpointer user_data) {
+  return layrz_wifi_layrz_wifi_api_request_permissions_response_new(TRUE);
+}
+
+static LayrzWifiLayrzWifiApiPermissionStatusResponse* handle_permission_status(gpointer user_data) {
+  return layrz_wifi_layrz_wifi_api_permission_status_response_new(
     LAYRZ_WIFI_WIFI_PERMISSION_STATUS_NOT_REQUIRED
   );
 }
@@ -240,7 +244,8 @@ static LayrzWifiLayrzWifiApiVTable vtable = {
   handle_current_ssid,
   handle_start_scan,
   handle_stop_scan,
-  handle_ensure_permissions,
+  handle_request_permissions,
+  handle_permission_status,
 };
 
 static void layrz_wifi_plugin_dispose(GObject* object) {
