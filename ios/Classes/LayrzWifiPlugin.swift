@@ -5,8 +5,11 @@ import NetworkExtension
 import SystemConfiguration.CaptiveNetwork
 
 public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
+  var events: LayrzWifiEvents?
+
   public static func register(with registrar: FlutterPluginRegistrar) {
     let plugin = LayrzWifiPlugin()
+    plugin.events = LayrzWifiEvents(binaryMessenger: registrar.messenger())
     LayrzWifiApiSetup.setUp(binaryMessenger: registrar.messenger(), api: plugin)
   }
 
@@ -32,8 +35,14 @@ public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
     }
   }
 
-  public func scan() throws -> [WifiNetwork] {
-    throw PigeonError(code: "UNSUPPORTED", message: "WiFi scan is not supported on iOS.", details: nil)
+  public func startScan() throws {
+    DispatchQueue.main.async {
+      self.events?.onScanError(message: "WiFi scan is not supported on iOS.") { _ in }
+    }
+  }
+
+  public func stopScan() throws {
+    // No-op on iOS
   }
 
   public func ensurePermissions() throws -> WifiPermissionStatus {
