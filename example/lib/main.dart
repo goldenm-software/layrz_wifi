@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:layrz_wifi/layrz_wifi.dart';
@@ -31,14 +33,22 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
   bool? _hasDiscovery;
   bool? _hasCurrentSsid;
   String? _currentSsid;
-  List<WifiNetwork> _networks = [];
+  final List<WifiNetwork> _networks = [];
   String? _status;
   bool _scanning = false;
+
+  StreamSubscription<WifiNetwork>? _scanSub;
 
   @override
   void initState() {
     super.initState();
     _probe();
+  }
+
+  @override
+  void dispose() {
+    _scanSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _probe() async {
@@ -64,31 +74,46 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
     }
   }
 
-  Future<void> _scan() async {
+  Future<void> _startScan() async {
+    final perm = await _wifi.ensurePermissions();
+    if (perm != WifiPermissionStatus.granted && perm != WifiPermissionStatus.notRequired) {
+      setState(() => _status = 'Permission not granted: $perm');
+      return;
+    }
+
     setState(() {
       _scanning = true;
-      _status = null;
+      _networks.clear();
+      _status = 'Scanning…';
     });
+
+    _scanSub = _wifi.scanResults.listen(
+      (network) => setState(() => _networks.add(network)),
+      onError: (e) => setState(() {
+        _status = 'Scan error: $e';
+        _scanning = false;
+      }),
+    );
+
     try {
-      final perm = await _wifi.ensurePermissions();
-      if (perm != WifiPermissionStatus.granted &&
-          perm != WifiPermissionStatus.notRequired) {
-        setState(() {
-          _status = 'Permission not granted: $perm';
-          _scanning = false;
-        });
-        return;
-      }
-      final results = await _wifi.scan();
-      setState(() {
-        _networks = results;
-        _status = 'Found ${results.length} networks';
-      });
+      await _wifi.startScan();
     } on PlatformException catch (e) {
-      setState(() => _status = 'Scan error: ${e.message}');
-    } finally {
-      setState(() => _scanning = false);
+      setState(() {
+        _status = 'Scan error: ${e.message}';
+        _scanning = false;
+      });
+      _scanSub?.cancel();
     }
+  }
+
+  Future<void> _stopScan() async {
+    await _wifi.stopScan();
+    await _scanSub?.cancel();
+    _scanSub = null;
+    setState(() {
+      _scanning = false;
+      _status = 'Found ${_networks.length} networks';
+    });
   }
 
   @override
@@ -102,16 +127,27 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
           _row('hasCurrentSsid', _hasCurrentSsid?.toString() ?? '…'),
           _row('currentSsid', _currentSsid ?? '…'),
           const Divider(),
-          ElevatedButton(
-            onPressed: (_hasDiscovery == true && !_scanning) ? _scan : null,
-            child: _scanning
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('Scan'),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: (_hasDiscovery == true && !_scanning) ? _startScan : null,
+                  child: const Text('Start Scan'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _scanning ? _stopScan : null,
+                  child: const Text('Stop Scan'),
+                ),
+              ),
+            ],
           ),
+          if (_scanning) ...[
+            const SizedBox(height: 8),
+            const LinearProgressIndicator(),
+          ],
           if (_status != null) ...[
             const SizedBox(height: 8),
             Text(_status!, style: const TextStyle(fontStyle: FontStyle.italic)),
