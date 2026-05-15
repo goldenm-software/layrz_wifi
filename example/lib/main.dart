@@ -82,24 +82,22 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
     // (which calls CLLocationManager on Apple, notRequired on others).
     if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) return true;
 
-    final Permission permission = Platform.isAndroid
-        ? (await Permission.nearbyWifiDevices.isGranted ? Permission.nearbyWifiDevices : Permission.location)
-        : Permission.locationWhenInUse;
+    if (Platform.isAndroid) {
+      final statuses = await [Permission.location, Permission.nearbyWifiDevices].request();
+      final granted = statuses.values.any((s) => s.isGranted);
+      if (!granted) setState(() => _status = 'Permission denied');
+      return granted;
+    }
 
-    var status = await permission.status;
-
+    var status = await Permission.locationWhenInUse.status;
     if (status.isGranted) return true;
-
     if (status.isPermanentlyDenied) {
       setState(() => _status = 'Permission permanently denied — open Settings to enable it.');
       await openAppSettings();
       return false;
     }
-
-    status = await permission.request();
-
+    status = await Permission.locationWhenInUse.request();
     if (status.isGranted) return true;
-
     setState(() => _status = 'Permission denied: $status');
     return false;
   }
