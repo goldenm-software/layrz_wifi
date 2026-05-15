@@ -65,3 +65,9 @@ publish-dry:
 
 publish:
 	flutter pub publish --force
+
+.PHONY: clean
+clean:
+	$(MAKE) -C example clean
+	flutter clean
+	flutter pub get

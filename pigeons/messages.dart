@@ -6,7 +6,7 @@ import 'package:pigeon/pigeon.dart';
     dartOptions: DartOptions(),
     kotlinOut: 'android/src/main/kotlin/com/goldenm/layrz_wifi/Messages.g.kt',
     kotlinOptions: KotlinOptions(package: 'com.goldenm.layrz_wifi'),
-    swiftOut: 'ios/Classes/Messages.g.swift',
+    swiftOut: 'darwin/layrz_wifi/Sources/layrz_wifi/Messages.g.swift',
     gobjectHeaderOut: 'linux/messages.g.h',
     gobjectSourceOut: 'linux/messages.g.cc',
     cppHeaderOut: 'windows/messages.g.h',
@@ -43,6 +43,15 @@ abstract class LayrzWifiApi {
   bool hasDiscovery();
   bool hasCurrentSsid();
   String? currentSsid();
-  List<WifiNetwork> scan();
-  WifiPermissionStatus ensurePermissions();
+  void startScan();
+  void stopScan();
+  bool requestPermissions();
+  WifiPermissionStatus permissionStatus();
+}
+
+@FlutterApi()
+abstract class LayrzWifiEvents {
+  void onScanResult(WifiNetwork network);
+  void onScanComplete();
+  void onScanError(String message);
 }

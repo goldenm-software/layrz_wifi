@@ -7,12 +7,11 @@
 
 #include <flutter/plugin_registrar_windows.h>
 
-#include <codecvt>
-#include <locale>
+#include <atomic>
 #include <memory>
 #include <optional>
 #include <string>
-#include <vector>
+#include <thread>
 
 #pragma comment(lib, "wlanapi.lib")
 #pragma comment(lib, "ole32.lib")
@@ -53,18 +52,49 @@ WifiSecurity ParseSecurity(DWORD auth, DWORD cipher) {
   }
 }
 
+// Tracks pending scan completions across all interfaces on a single handle.
+struct ScanCtx {
+  HANDLE event;
+  LONG pending{0};  // counts interfaces awaiting scan_complete/fail
+};
+
+void WINAPI ScanNotifyCallback(PWLAN_NOTIFICATION_DATA pNotifData, PVOID pContext) {
+  if (!pContext || pNotifData->NotificationSource != WLAN_NOTIFICATION_SOURCE_ACM) {
+    return;
+  }
+  if (pNotifData->NotificationCode == wlan_notification_acm_scan_complete ||
+      pNotifData->NotificationCode == wlan_notification_acm_scan_fail) {
+    auto* ctx = reinterpret_cast<ScanCtx*>(pContext);
+    if (InterlockedDecrement(&ctx->pending) <= 0) {
+      SetEvent(ctx->event);
+    }
+  }
+}
+
 }  // namespace
 
 // static
 void LayrzWifiPlugin::RegisterWithRegistrar(
     flutter::PluginRegistrarWindows *registrar) {
   auto plugin = std::make_unique<LayrzWifiPlugin>();
+  plugin->ui_thread_ = std::make_unique<LayrzWifiPluginUiThreadHandler>(registrar);
+  plugin->events_ = std::make_unique<LayrzWifiEvents>(registrar->messenger());
   LayrzWifiApi::SetUp(registrar->messenger(), plugin.get());
   registrar->AddPlugin(std::move(plugin));
 }
 
-LayrzWifiPlugin::LayrzWifiPlugin() {}
-LayrzWifiPlugin::~LayrzWifiPlugin() {}
+LayrzWifiPlugin::LayrzWifiPlugin() {
+  cancel_event_ = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+}
+
+LayrzWifiPlugin::~LayrzWifiPlugin() {
+  scanning_ = false;
+  if (cancel_event_) {
+    SetEvent(cancel_event_);
+    CloseHandle(cancel_event_);
+    cancel_event_ = nullptr;
+  }
+}
 
 ErrorOr<bool> LayrzWifiPlugin::HasDiscovery() { return true; }
 
@@ -108,51 +138,131 @@ ErrorOr<std::optional<std::string>> LayrzWifiPlugin::CurrentSsid() {
   return result;
 }
 
-ErrorOr<flutter::EncodableList> LayrzWifiPlugin::Scan() {
-  HANDLE handle = nullptr;
-  DWORD negVersion = 0;
-  if (WlanOpenHandle(2, nullptr, &negVersion, &handle) != ERROR_SUCCESS) {
-    return FlutterError("WLAN_ERROR", "Failed to open WLAN handle.");
+std::optional<FlutterError> LayrzWifiPlugin::StartScan() {
+  if (scanning_.exchange(true)) {
+    return FlutterError("SCAN_IN_PROGRESS", "A scan is already in progress.");
   }
 
-  PWLAN_INTERFACE_INFO_LIST ifList = nullptr;
-  if (WlanEnumInterfaces(handle, nullptr, &ifList) != ERROR_SUCCESS) {
+  ResetEvent(cancel_event_);
+
+  std::thread([this]() {
+    HANDLE handle = nullptr;
+    DWORD negVersion = 0;
+    if (WlanOpenHandle(2, nullptr, &negVersion, &handle) != ERROR_SUCCESS) {
+      if (scanning_.exchange(false)) {
+        ui_thread_->Post([this]() {
+          events_->OnScanError("Failed to open WLAN handle.",
+                               []() {},
+                               [](const FlutterError&) {});
+        });
+      }
+      return;
+    }
+
+    PWLAN_INTERFACE_INFO_LIST ifList = nullptr;
+    if (WlanEnumInterfaces(handle, nullptr, &ifList) != ERROR_SUCCESS) {
+      if (scanning_.exchange(false)) {
+        ui_thread_->Post([this]() {
+          events_->OnScanError("Failed to enumerate WLAN interfaces.",
+                               []() {},
+                               [](const FlutterError&) {});
+        });
+      }
+      WlanCloseHandle(handle, nullptr);
+      return;
+    }
+
+    // Register one notification handler for all interfaces on this handle
+    ScanCtx ctx;
+    ctx.event = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+    ctx.pending = static_cast<LONG>(ifList->dwNumberOfItems);
+
+    WlanRegisterNotification(handle, WLAN_NOTIFICATION_SOURCE_ACM, TRUE,
+                             ScanNotifyCallback, &ctx, nullptr, nullptr);
+
+    // Trigger scan on all interfaces
+    for (DWORD i = 0; i < ifList->dwNumberOfItems; i++) {
+      if (!scanning_) break;
+      WlanScan(handle, &ifList->InterfaceInfo[i].InterfaceGuid,
+               nullptr, nullptr, nullptr);
+    }
+
+    // Wait for all interfaces to complete, cancel, or timeout (15s)
+    if (scanning_) {
+      HANDLE waits[] = { ctx.event, cancel_event_ };
+      WaitForMultipleObjects(2, waits, FALSE, 15000);
+    }
+
+    // Unregister before ctx goes out of scope
+    WlanRegisterNotification(handle, WLAN_NOTIFICATION_SOURCE_NONE, TRUE,
+                             nullptr, nullptr, nullptr, nullptr);
+    CloseHandle(ctx.event);
+
+    // Read results from all interfaces
+    for (DWORD i = 0; i < ifList->dwNumberOfItems; i++) {
+      if (!scanning_) break;
+
+      const GUID& guid = ifList->InterfaceInfo[i].InterfaceGuid;
+
+      PWLAN_AVAILABLE_NETWORK_LIST netList = nullptr;
+      if (WlanGetAvailableNetworkList(handle, &guid,
+                                      WLAN_AVAILABLE_NETWORK_INCLUDE_ALL_ADHOC_PROFILES |
+                                      WLAN_AVAILABLE_NETWORK_INCLUDE_ALL_MANUAL_HIDDEN_PROFILES,
+                                      nullptr, &netList) != ERROR_SUCCESS) {
+        continue;
+      }
+
+      for (DWORD j = 0; j < netList->dwNumberOfItems; j++) {
+        if (!scanning_) break;
+
+        const WLAN_AVAILABLE_NETWORK& net = netList->Network[j];
+        const DOT11_SSID& ssid = net.dot11Ssid;
+
+        // Skip hidden networks (empty SSID)
+        if (ssid.uSSIDLength == 0) continue;
+
+        std::string ssidStr(reinterpret_cast<const char*>(ssid.ucSSID), ssid.uSSIDLength);
+
+        WifiNetwork network(ssidStr, ParseSecurity(net.dot11DefaultAuthAlgorithm,
+                                                    net.dot11DefaultCipherAlgorithm),
+                            false);
+        network.set_signal_dbm(static_cast<int64_t>(net.wlanSignalQuality));
+
+        ui_thread_->Post([this, network]() {
+          events_->OnScanResult(network,
+                                []() {},
+                                [](const FlutterError&) {});
+        });
+      }
+      WlanFreeMemory(netList);
+    }
+
+    WlanFreeMemory(ifList);
     WlanCloseHandle(handle, nullptr);
-    return FlutterError("WLAN_ERROR", "Failed to enumerate WLAN interfaces.");
-  }
 
-  flutter::EncodableList networks;
-
-  for (DWORD i = 0; i < ifList->dwNumberOfItems; i++) {
-    const GUID& guid = ifList->InterfaceInfo[i].InterfaceGuid;
-    WlanScan(handle, &guid, nullptr, nullptr, nullptr);
-
-    PWLAN_AVAILABLE_NETWORK_LIST netList = nullptr;
-    if (WlanGetAvailableNetworkList(handle, &guid, 0, nullptr, &netList) != ERROR_SUCCESS) {
-      continue;
+    if (scanning_.exchange(false)) {
+      ui_thread_->Post([this]() {
+        events_->OnScanComplete(
+            []() {},
+            [](const FlutterError&) {});
+      });
     }
+  }).detach();
 
-    for (DWORD j = 0; j < netList->dwNumberOfItems; j++) {
-      const WLAN_AVAILABLE_NETWORK& net = netList->Network[j];
-      const DOT11_SSID& ssid = net.dot11Ssid;
-      std::string ssidStr(reinterpret_cast<const char*>(ssid.ucSSID), ssid.uSSIDLength);
-      bool isHidden = ssid.uSSIDLength == 0;
-
-      WifiNetwork network(ssidStr, ParseSecurity(net.dot11DefaultAuthAlgorithm,
-                                                  net.dot11DefaultCipherAlgorithm),
-                          isHidden);
-      network.set_signal_dbm(static_cast<int64_t>(net.wlanSignalQuality));
-      networks.push_back(flutter::CustomEncodableValue(network));
-    }
-    WlanFreeMemory(netList);
-  }
-
-  WlanFreeMemory(ifList);
-  WlanCloseHandle(handle, nullptr);
-  return networks;
+  return std::nullopt;
 }
 
-ErrorOr<WifiPermissionStatus> LayrzWifiPlugin::EnsurePermissions() {
+std::optional<FlutterError> LayrzWifiPlugin::StopScan() {
+  scanning_ = false;
+  SetEvent(cancel_event_);
+  return std::nullopt;
+}
+
+ErrorOr<bool> LayrzWifiPlugin::RequestPermissions() {
+  return true;
+}
+
+ErrorOr<WifiPermissionStatus> LayrzWifiPlugin::PermissionStatus() {
   return WifiPermissionStatus::kNotRequired;
 }
 

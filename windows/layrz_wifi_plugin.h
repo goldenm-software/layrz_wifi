@@ -1,9 +1,12 @@
 #ifndef FLUTTER_PLUGIN_LAYRZ_WIFI_PLUGIN_H_
 #define FLUTTER_PLUGIN_LAYRZ_WIFI_PLUGIN_H_
 
+#include <windows.h>
 #include <flutter/plugin_registrar_windows.h>
 #include "messages.g.h"
+#include "thread_handler.hpp"
 
+#include <atomic>
 #include <memory>
 
 namespace layrz_wifi {
@@ -21,8 +24,16 @@ class LayrzWifiPlugin : public flutter::Plugin, public LayrzWifiApi {
   ErrorOr<bool> HasDiscovery() override;
   ErrorOr<bool> HasCurrentSsid() override;
   ErrorOr<std::optional<std::string>> CurrentSsid() override;
-  ErrorOr<flutter::EncodableList> Scan() override;
-  ErrorOr<WifiPermissionStatus> EnsurePermissions() override;
+  std::optional<FlutterError> StartScan() override;
+  std::optional<FlutterError> StopScan() override;
+  ErrorOr<bool> RequestPermissions() override;
+  ErrorOr<WifiPermissionStatus> PermissionStatus() override;
+
+ private:
+  std::unique_ptr<LayrzWifiEvents> events_;
+  std::atomic<bool> scanning_{false};
+  std::unique_ptr<LayrzWifiPluginUiThreadHandler> ui_thread_;
+  HANDLE cancel_event_{nullptr};
 };
 
 }  // namespace layrz_wifi

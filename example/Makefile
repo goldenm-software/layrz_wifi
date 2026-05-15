@@ -89,3 +89,13 @@ plugin-analyze:
 
 plugin-test:
 	$(MAKE) -C $(ROOT) test
+
+.PHONY: clean
+clean:
+	flutter clean
+	flutter pub get
+
+.PHONY: pod
+pod:
+	$(MAKE) -C macos pod
+	$(MAKE) -C ios pod

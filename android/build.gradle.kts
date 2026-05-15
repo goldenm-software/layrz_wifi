@@ -1,4 +1,4 @@
-group = "com.goldenm.layrz_wifi"
+group = "com.layrz.layrz_wifi"
 version = "1.0-SNAPSHOT"
 
 buildscript {
