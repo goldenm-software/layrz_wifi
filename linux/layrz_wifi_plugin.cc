@@ -8,6 +8,8 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <thread>
+#include <atomic>
 
 #define LAYRZ_WIFI_PLUGIN(obj) \
   (G_TYPE_CHECK_INSTANCE_CAST((obj), layrz_wifi_plugin_get_type(), LayrzWifiPlugin))
@@ -15,6 +17,8 @@
 struct _LayrzWifiPlugin {
   GObject parent_instance;
   FlBinaryMessenger* messenger;
+  LayrzWifiLayrzWifiEvents* events;
+  std::atomic<bool> scanning;
 };
 
 G_DEFINE_TYPE(LayrzWifiPlugin, layrz_wifi_plugin, g_object_get_type())
@@ -50,19 +54,81 @@ static LayrzWifiLayrzWifiApiCurrentSsidResponse* handle_current_ssid(gpointer us
   return layrz_wifi_layrz_wifi_api_current_ssid_response_new(result);
 }
 
-static LayrzWifiLayrzWifiApiScanResponse* handle_scan(gpointer user_data) {
-  // nmcli -t -f SSID,BSSID,SIGNAL,SECURITY dev wifi list
+// Data structure for passing network info from worker thread to main thread
+struct ScanResultData {
+  LayrzWifiPlugin* plugin;
+  LayrzWifiWifiNetwork* network;
+};
+
+struct ScanErrorData {
+  LayrzWifiPlugin* plugin;
+  gchar* message;
+};
+
+// Idle callback to post a scan result on the main thread
+static gboolean post_scan_result_idle(gpointer data) {
+  auto* d = static_cast<ScanResultData*>(data);
+
+  layrz_wifi_layrz_wifi_events_on_scan_result(
+    d->plugin->events,
+    d->network,
+    nullptr,
+    nullptr,
+    nullptr
+  );
+
+  g_object_unref(d->network);
+  g_object_unref(d->plugin);
+  delete d;
+  return G_SOURCE_REMOVE;
+}
+
+// Idle callback to post scan completion on the main thread
+static gboolean post_scan_complete_idle(gpointer data) {
+  auto* plugin = static_cast<LayrzWifiPlugin*>(data);
+
+  layrz_wifi_layrz_wifi_events_on_scan_complete(
+    plugin->events,
+    nullptr,
+    nullptr,
+    nullptr
+  );
+
+  g_object_unref(plugin);
+  return G_SOURCE_REMOVE;
+}
+
+// Idle callback to post scan error on the main thread
+static gboolean post_scan_error_idle(gpointer data) {
+  auto* d = static_cast<ScanErrorData*>(data);
+
+  layrz_wifi_layrz_wifi_events_on_scan_error(
+    d->plugin->events,
+    d->message,
+    nullptr,
+    nullptr,
+    nullptr
+  );
+
+  g_object_unref(d->plugin);
+  g_free(d->message);
+  delete d;
+  return G_SOURCE_REMOVE;
+}
+
+// Worker thread function to perform the WiFi scan
+static void scan_worker_thread(LayrzWifiPlugin* plugin) {
   FILE* pipe = popen("nmcli -t -f SSID,BSSID,SIGNAL,SECURITY dev wifi list 2>/dev/null", "r");
   if (!pipe) {
-    FlValue* empty = fl_value_new_list();
-    auto* resp = layrz_wifi_layrz_wifi_api_scan_response_new(empty);
-    fl_value_unref(empty);
-    return resp;
+    auto* err_data = new ScanErrorData();
+    err_data->plugin = LAYRZ_WIFI_PLUGIN(g_object_ref(plugin));
+    err_data->message = g_strdup("Failed to run nmcli command");
+    g_idle_add(post_scan_error_idle, err_data);
+    return;
   }
 
-  FlValue* list = fl_value_new_list();
   char line[512];
-  while (fgets(line, sizeof(line), pipe)) {
+  while (fgets(line, sizeof(line), pipe) && plugin->scanning.load()) {
     size_t len = strlen(line);
     while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) line[--len] = '\0';
 
@@ -127,18 +193,39 @@ static LayrzWifiLayrzWifiApiScanResponse* handle_scan(gpointer user_data) {
       sec,
       hidden
     );
-    fl_value_append_take(list, fl_value_new_custom(
-      131,
-      g_object_ref(net),
-      g_object_unref
-    ));
+
+    // Post result to main thread via idle callback
+    auto* result_data = new ScanResultData();
+    result_data->plugin = LAYRZ_WIFI_PLUGIN(g_object_ref(plugin));
+    result_data->network = g_object_ref(net);
+    g_idle_add(post_scan_result_idle, result_data);
+
     g_object_unref(net);
   }
+
   pclose(pipe);
 
-  auto* resp = layrz_wifi_layrz_wifi_api_scan_response_new(list);
-  fl_value_unref(list);
-  return resp;
+  // Post completion to main thread
+  auto* complete_data = LAYRZ_WIFI_PLUGIN(g_object_ref(plugin));
+  g_idle_add(post_scan_complete_idle, complete_data);
+}
+
+static LayrzWifiLayrzWifiApiStartScanResponse* handle_start_scan(gpointer user_data) {
+  LayrzWifiPlugin* plugin = static_cast<LayrzWifiPlugin*>(user_data);
+  plugin->scanning.store(true);
+
+  // Spawn worker thread
+  std::thread worker_thread(scan_worker_thread, plugin);
+  worker_thread.detach();
+
+  return layrz_wifi_layrz_wifi_api_start_scan_response_new();
+}
+
+static LayrzWifiLayrzWifiApiStopScanResponse* handle_stop_scan(gpointer user_data) {
+  LayrzWifiPlugin* plugin = static_cast<LayrzWifiPlugin*>(user_data);
+  plugin->scanning.store(false);
+
+  return layrz_wifi_layrz_wifi_api_stop_scan_response_new();
 }
 
 static LayrzWifiLayrzWifiApiEnsurePermissionsResponse* handle_ensure_permissions(gpointer user_data) {
@@ -151,13 +238,15 @@ static LayrzWifiLayrzWifiApiVTable vtable = {
   handle_has_discovery,
   handle_has_current_ssid,
   handle_current_ssid,
-  handle_scan,
+  handle_start_scan,
+  handle_stop_scan,
   handle_ensure_permissions,
 };
 
 static void layrz_wifi_plugin_dispose(GObject* object) {
   LayrzWifiPlugin* self = LAYRZ_WIFI_PLUGIN(object);
   layrz_wifi_layrz_wifi_api_clear_method_handlers(self->messenger, nullptr);
+  g_clear_object(&self->events);
   g_clear_object(&self->messenger);
   G_OBJECT_CLASS(layrz_wifi_plugin_parent_class)->dispose(object);
 }
@@ -166,7 +255,10 @@ static void layrz_wifi_plugin_class_init(LayrzWifiPluginClass* klass) {
   G_OBJECT_CLASS(klass)->dispose = layrz_wifi_plugin_dispose;
 }
 
-static void layrz_wifi_plugin_init(LayrzWifiPlugin* self) {}
+static void layrz_wifi_plugin_init(LayrzWifiPlugin* self) {
+  self->events = nullptr;
+  self->scanning.store(false);
+}
 
 void layrz_wifi_plugin_register_with_registrar(FlPluginRegistrar* registrar) {
   LayrzWifiPlugin* plugin = LAYRZ_WIFI_PLUGIN(
@@ -174,6 +266,9 @@ void layrz_wifi_plugin_register_with_registrar(FlPluginRegistrar* registrar) {
 
   FlBinaryMessenger* messenger = fl_plugin_registrar_get_messenger(registrar);
   plugin->messenger = FL_BINARY_MESSENGER(g_object_ref(messenger));
+
+  // Create the FlutterApi callback object
+  plugin->events = layrz_wifi_layrz_wifi_events_new(messenger, nullptr);
 
   layrz_wifi_layrz_wifi_api_set_method_handlers(
     messenger, nullptr, &vtable, plugin, g_object_unref);
