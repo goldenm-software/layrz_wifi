@@ -16,13 +16,17 @@ public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
   func hasCurrentSsid() throws -> Bool { true }
 
   func currentSsid() throws -> String? {
-    return CWWiFiClient.shared().interface()?.ssid()
+    let client = CWWiFiClient.shared()
+    let iface = client.interfaces()?.first ?? client.interface()
+    return iface?.ssid()
   }
 
   func startScan() throws {
     DispatchQueue.global(qos: .userInitiated).async {
       do {
-        guard let iface = CWWiFiClient.shared().interface() else {
+        let client = CWWiFiClient.shared()
+        let interfaces = client.interfaces() ?? []
+        guard let iface = interfaces.first ?? client.interface() else {
           DispatchQueue.main.async {
             self.events?.onScanError(message: "No WiFi interface found.") { _ in }
           }
