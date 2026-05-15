@@ -55,7 +55,7 @@ WifiSecurity ParseSecurity(DWORD auth, DWORD cipher) {
 // Tracks pending scan completions across all interfaces on a single handle.
 struct ScanCtx {
   HANDLE event;
-  std::atomic<LONG> pending{0};  // counts interfaces awaiting scan_complete/fail
+  LONG pending{0};  // counts interfaces awaiting scan_complete/fail
 };
 
 void WINAPI ScanNotifyCallback(PWLAN_NOTIFICATION_DATA pNotifData, PVOID pContext) {
