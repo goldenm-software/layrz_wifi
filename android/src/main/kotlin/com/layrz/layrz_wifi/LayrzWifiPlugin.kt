@@ -1,4 +1,4 @@
-package com.goldenm.layrz_wifi
+package com.layrz.layrz_wifi
 
 import android.Manifest
 import android.content.BroadcastReceiver

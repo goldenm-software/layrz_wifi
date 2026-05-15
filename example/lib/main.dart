@@ -83,7 +83,10 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
     if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) return true;
 
     if (Platform.isAndroid) {
-      final statuses = await [Permission.location, Permission.nearbyWifiDevices].request();
+      final statuses = await [
+        Permission.locationWhenInUse,
+        Permission.nearbyWifiDevices,
+      ].request();
       final granted = statuses.values.any((s) => s.isGranted);
       if (!granted) setState(() => _status = 'Permission denied');
       return granted;
@@ -92,7 +95,10 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
     var status = await Permission.locationWhenInUse.status;
     if (status.isGranted) return true;
     if (status.isPermanentlyDenied) {
-      setState(() => _status = 'Permission permanently denied — open Settings to enable it.');
+      setState(
+        () => _status =
+            'Permission permanently denied — open Settings to enable it.',
+      );
       await openAppSettings();
       return false;
     }
@@ -179,17 +185,25 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
             children: [
               Expanded(
                 child: ElevatedButton(
-                  onPressed: (_hasDiscovery == true && !_scanning) ? _startScan : null,
+                  onPressed: (_hasDiscovery == true && !_scanning)
+                      ? _startScan
+                      : null,
                   child: const Text('Start Scan'),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: ElevatedButton(onPressed: _scanning ? _stopScan : null, child: const Text('Stop Scan')),
+                child: ElevatedButton(
+                  onPressed: _scanning ? _stopScan : null,
+                  child: const Text('Stop Scan'),
+                ),
               ),
             ],
           ),
-          if (_scanning) ...[const SizedBox(height: 8), const LinearProgressIndicator()],
+          if (_scanning) ...[
+            const SizedBox(height: 8),
+            const LinearProgressIndicator(),
+          ],
           if (_status != null) ...[
             const SizedBox(height: 8),
             Text(_status!, style: const TextStyle(fontStyle: FontStyle.italic)),
@@ -199,7 +213,9 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
             (n) => Card(
               child: ListTile(
                 title: Text(n.ssid.isEmpty ? '(hidden)' : n.ssid),
-                subtitle: Text('${n.bssid ?? ''} · ${n.security.name} · ${n.signalDbm ?? '?'} dBm'),
+                subtitle: Text(
+                  '${n.bssid ?? ''} · ${n.security.name} · ${n.signalDbm ?? '?'} dBm',
+                ),
               ),
             ),
           ),

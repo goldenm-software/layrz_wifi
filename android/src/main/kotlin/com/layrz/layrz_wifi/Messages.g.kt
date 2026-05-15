@@ -9,7 +9,7 @@
 // See also: https://pub.dev/packages/pigeon
 @file:Suppress("UNCHECKED_CAST", "ArrayInDataClass")
 
-package com.goldenm.layrz_wifi
+package com.layrz.layrz_wifi
 
 import android.util.Log
 import io.flutter.plugin.common.BasicMessageChannel
@@ -308,7 +308,7 @@ class LayrzWifiEvents(private val binaryMessenger: BinaryMessenger, private val 
         }
       } else {
         callback(Result.failure(createConnectionError(channelName)))
-      } 
+      }
     }
   }
   fun onScanComplete(callback: (Result<Unit>) -> Unit)
@@ -325,7 +325,7 @@ class LayrzWifiEvents(private val binaryMessenger: BinaryMessenger, private val 
         }
       } else {
         callback(Result.failure(createConnectionError(channelName)))
-      } 
+      }
     }
   }
   fun onScanError(messageArg: String, callback: (Result<Unit>) -> Unit)
@@ -342,7 +342,7 @@ class LayrzWifiEvents(private val binaryMessenger: BinaryMessenger, private val 
         }
       } else {
         callback(Result.failure(createConnectionError(channelName)))
-      } 
+      }
     }
   }
 }
