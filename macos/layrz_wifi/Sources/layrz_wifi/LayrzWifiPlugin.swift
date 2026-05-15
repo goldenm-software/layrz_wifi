@@ -26,6 +26,13 @@ public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi, CLLocationM
   }
 
   func startScan() throws {
+    guard (try? permissionStatus()) == .granted else {
+      DispatchQueue.main.async {
+        self.events?.onScanError(message: "Location permission is required to scan for WiFi networks.") { _ in }
+      }
+      return
+    }
+
     DispatchQueue.global(qos: .userInitiated).async {
         do {
             let client = CWWiFiClient.shared()
@@ -70,7 +77,26 @@ public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi, CLLocationM
 
   func stopScan() throws {}
 
-  func ensurePermissions() throws -> WifiPermissionStatus {
+  func requestPermissions() throws -> Bool {
+    let manager = locationManager ?? CLLocationManager()
+    let status: CLAuthorizationStatus
+    if #available(macOS 11.0, *) {
+      status = manager.authorizationStatus
+    } else {
+      status = CLLocationManager.authorizationStatus()
+    }
+    switch status {
+    case .authorizedAlways, .authorized:
+      return true
+    case .notDetermined:
+      manager.requestAlwaysAuthorization()
+      return false
+    default:
+      return false
+    }
+  }
+
+  func permissionStatus() throws -> WifiPermissionStatus {
     let manager = locationManager ?? CLLocationManager()
     let status: CLAuthorizationStatus
     if #available(macOS 11.0, *) {
@@ -86,8 +112,7 @@ public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi, CLLocationM
     case .restricted:
       return .restricted
     case .notDetermined:
-      manager.requestAlwaysAuthorization()
-      return .notRequired
+      return .denied
     @unknown default:
       return .denied
     }
