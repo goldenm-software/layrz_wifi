@@ -3,28 +3,16 @@
 #include <gtest/gtest.h>
 
 #include "include/layrz_wifi/layrz_wifi_plugin.h"
-#include "layrz_wifi_plugin_private.h"
 
-// This demonstrates a simple unit test of the C portion of this plugin's
-// implementation.
-//
-// Once you have built the plugin's example app, you can run these tests
-// from the command line. For instance, for a plugin called my_plugin
-// built for x64 debug, run:
-// $ build/linux/x64/debug/plugins/my_plugin/my_plugin_test
-
+// Placeholder test — the plugin uses Pigeon-generated channels;
+// actual integration testing happens via Flutter integration tests.
 namespace layrz_wifi {
 namespace test {
 
-TEST(LayrzWifiPlugin, GetPlatformVersion) {
-  g_autoptr(FlMethodResponse) response = get_platform_version();
-  ASSERT_NE(response, nullptr);
-  ASSERT_TRUE(FL_IS_METHOD_SUCCESS_RESPONSE(response));
-  FlValue* result = fl_method_success_response_get_result(
-      FL_METHOD_SUCCESS_RESPONSE(response));
-  ASSERT_EQ(fl_value_get_type(result), FL_VALUE_TYPE_STRING);
-  // The full string varies, so just validate that it has the right format.
-  EXPECT_THAT(fl_value_get_string(result), testing::StartsWith("Linux "));
+TEST(LayrzWifiPlugin, PluginRegistrarIsNotNull) {
+  // Sanity-check that the plugin type is registered.
+  GType t = layrz_wifi_plugin_get_type();
+  ASSERT_NE(t, static_cast<GType>(0));
 }
 
 }  // namespace test

@@ -89,3 +89,8 @@ plugin-analyze:
 
 plugin-test:
 	$(MAKE) -C $(ROOT) test
+
+.PHONY: clean
+clean:
+	flutter clean
+	flutter pub get
