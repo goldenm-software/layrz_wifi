@@ -43,6 +43,14 @@ abstract class LayrzWifiApi {
   bool hasDiscovery();
   bool hasCurrentSsid();
   String? currentSsid();
-  List<WifiNetwork> scan();
+  void startScan();
+  void stopScan();
   WifiPermissionStatus ensurePermissions();
+}
+
+@FlutterApi()
+abstract class LayrzWifiEvents {
+  void onScanResult(WifiNetwork network);
+  void onScanComplete();
+  void onScanError(String message);
 }
