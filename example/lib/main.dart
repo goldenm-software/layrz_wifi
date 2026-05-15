@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:layrz_wifi/layrz_wifi.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() {
   runApp(const MyApp());
@@ -74,10 +76,43 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
     }
   }
 
+  /// Requests the platform permission needed for Wi-Fi scanning.
+  /// Returns true if the app may proceed with scanning.
+  Future<bool> _requestPermission() async {
+    // Linux/Windows/macOS don't need runtime permission_handler grants.
+    if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) return true;
+
+    final permission = Platform.isAndroid
+        ? (await Permission.nearbyWifiDevices.isGranted
+            ? Permission.nearbyWifiDevices
+            : Permission.location)
+        : Permission.locationWhenInUse;
+
+    var status = await permission.status;
+
+    if (status.isGranted) return true;
+
+    if (status.isPermanentlyDenied) {
+      setState(() => _status = 'Permission permanently denied — open Settings to enable it.');
+      await openAppSettings();
+      return false;
+    }
+
+    status = await permission.request();
+
+    if (status.isGranted) return true;
+
+    setState(() => _status = 'Permission denied: $status');
+    return false;
+  }
+
   Future<void> _startScan() async {
+    final allowed = await _requestPermission();
+    if (!allowed) return;
+
     final perm = await _wifi.ensurePermissions();
     if (perm != WifiPermissionStatus.granted && perm != WifiPermissionStatus.notRequired) {
-      setState(() => _status = 'Permission not granted: $perm');
+      setState(() => _status = 'Plugin permission check failed: $perm');
       return;
     }
 
