@@ -52,6 +52,29 @@ WifiSecurity ParseSecurity(DWORD auth, DWORD cipher) {
   }
 }
 
+struct ScanCtx {
+  HANDLE event;
+  GUID guid;
+  bool success;
+};
+
+void WINAPI ScanNotifyCallback(PWLAN_NOTIFICATION_DATA pNotifData, PVOID pContext) {
+  if (!pContext || pNotifData->NotificationSource != WLAN_NOTIFICATION_SOURCE_ACM) {
+    return;
+  }
+  auto* ctx = reinterpret_cast<ScanCtx*>(pContext);
+  if (!IsEqualGUID(pNotifData->InterfaceGuid, ctx->guid)) {
+    return;
+  }
+  if (pNotifData->NotificationCode == wlan_notification_acm_scan_complete) {
+    ctx->success = true;
+    SetEvent(ctx->event);
+  } else if (pNotifData->NotificationCode == wlan_notification_acm_scan_fail) {
+    ctx->success = false;
+    SetEvent(ctx->event);
+  }
+}
+
 }  // namespace
 
 // static
@@ -64,9 +87,17 @@ void LayrzWifiPlugin::RegisterWithRegistrar(
   registrar->AddPlugin(std::move(plugin));
 }
 
-LayrzWifiPlugin::LayrzWifiPlugin() {}
+LayrzWifiPlugin::LayrzWifiPlugin() {
+  cancel_event_ = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+}
+
 LayrzWifiPlugin::~LayrzWifiPlugin() {
   scanning_ = false;
+  if (cancel_event_) {
+    SetEvent(cancel_event_);
+    CloseHandle(cancel_event_);
+    cancel_event_ = nullptr;
+  }
 }
 
 ErrorOr<bool> LayrzWifiPlugin::HasDiscovery() { return true; }
@@ -116,7 +147,9 @@ std::optional<FlutterError> LayrzWifiPlugin::StartScan() {
     return FlutterError("SCAN_IN_PROGRESS", "A scan is already in progress.");
   }
 
-  // Spawn scan thread
+  // Reset cancel event so the new scan isn't immediately cancelled
+  ResetEvent(cancel_event_);
+
   std::thread([this]() {
     HANDLE handle = nullptr;
     DWORD negVersion = 0;
@@ -145,12 +178,32 @@ std::optional<FlutterError> LayrzWifiPlugin::StartScan() {
     }
 
     for (DWORD i = 0; i < ifList->dwNumberOfItems; i++) {
-      if (!scanning_) {
-        break;
-      }
+      if (!scanning_) break;
 
       const GUID& guid = ifList->InterfaceInfo[i].InterfaceGuid;
-      WlanScan(handle, &guid, nullptr, nullptr, nullptr);
+
+      // Set up per-interface scan context before registering notifications
+      ScanCtx ctx;
+      ctx.event = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+      ctx.guid = guid;
+      ctx.success = false;
+
+      // Register notification BEFORE triggering scan to avoid race
+      WlanRegisterNotification(handle, WLAN_NOTIFICATION_SOURCE_ACM, TRUE,
+                               ScanNotifyCallback, &ctx, nullptr, nullptr);
+
+      if (WlanScan(handle, &guid, nullptr, nullptr, nullptr) == ERROR_SUCCESS) {
+        // Wait for scan complete, scan fail, or user cancel (10s timeout)
+        HANDLE waits[] = { ctx.event, cancel_event_ };
+        WaitForMultipleObjects(2, waits, FALSE, 10000);
+      }
+
+      // Unregister before reading results — ctx lifetime ends after this block
+      WlanRegisterNotification(handle, WLAN_NOTIFICATION_SOURCE_NONE, TRUE,
+                               nullptr, nullptr, nullptr, nullptr);
+      CloseHandle(ctx.event);
+
+      if (!scanning_) break;
 
       PWLAN_AVAILABLE_NETWORK_LIST netList = nullptr;
       if (WlanGetAvailableNetworkList(handle, &guid, 0, nullptr, &netList) != ERROR_SUCCESS) {
@@ -158,9 +211,7 @@ std::optional<FlutterError> LayrzWifiPlugin::StartScan() {
       }
 
       for (DWORD j = 0; j < netList->dwNumberOfItems; j++) {
-        if (!scanning_) {
-          break;
-        }
+        if (!scanning_) break;
 
         const WLAN_AVAILABLE_NETWORK& net = netList->Network[j];
         const DOT11_SSID& ssid = net.dot11Ssid;
@@ -172,7 +223,6 @@ std::optional<FlutterError> LayrzWifiPlugin::StartScan() {
                             isHidden);
         network.set_signal_dbm(static_cast<int64_t>(net.wlanSignalQuality));
 
-        // Post OnScanResult to the Flutter UI thread
         ui_thread_->Post([this, network]() {
           events_->OnScanResult(network,
                                 []() {},
@@ -185,7 +235,6 @@ std::optional<FlutterError> LayrzWifiPlugin::StartScan() {
     WlanFreeMemory(ifList);
     WlanCloseHandle(handle, nullptr);
 
-    // Post OnScanComplete to the Flutter UI thread
     if (scanning_.exchange(false)) {
       ui_thread_->Post([this]() {
         events_->OnScanComplete(
@@ -200,6 +249,7 @@ std::optional<FlutterError> LayrzWifiPlugin::StartScan() {
 
 std::optional<FlutterError> LayrzWifiPlugin::StopScan() {
   scanning_ = false;
+  SetEvent(cancel_event_);
   return std::nullopt;
 }
 

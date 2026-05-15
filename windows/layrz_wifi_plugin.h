@@ -1,6 +1,7 @@
 #ifndef FLUTTER_PLUGIN_LAYRZ_WIFI_PLUGIN_H_
 #define FLUTTER_PLUGIN_LAYRZ_WIFI_PLUGIN_H_
 
+#include <windows.h>
 #include <flutter/plugin_registrar_windows.h>
 #include "messages.g.h"
 #include "thread_handler.hpp"
@@ -32,6 +33,7 @@ class LayrzWifiPlugin : public flutter::Plugin, public LayrzWifiApi {
   std::unique_ptr<LayrzWifiEvents> events_;
   std::atomic<bool> scanning_{false};
   std::unique_ptr<LayrzWifiPluginUiThreadHandler> ui_thread_;
+  HANDLE cancel_event_{nullptr};
 };
 
 }  // namespace layrz_wifi
