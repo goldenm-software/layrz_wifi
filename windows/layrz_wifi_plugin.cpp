@@ -12,6 +12,7 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <unordered_map>
 
 #pragma comment(lib, "wlanapi.lib")
 #pragma comment(lib, "ole32.lib")
@@ -205,23 +206,43 @@ std::optional<FlutterError> LayrzWifiPlugin::StartScan() {
 
       if (!scanning_) break;
 
+      // Build SSID→security map from available-network list
+      std::unordered_map<std::string, WifiSecurity> securityMap;
       PWLAN_AVAILABLE_NETWORK_LIST netList = nullptr;
-      if (WlanGetAvailableNetworkList(handle, &guid, 0, nullptr, &netList) != ERROR_SUCCESS) {
+      if (WlanGetAvailableNetworkList(handle, &guid,
+                                      WLAN_AVAILABLE_NETWORK_INCLUDE_ALL_ADHOC_PROFILES |
+                                      WLAN_AVAILABLE_NETWORK_INCLUDE_ALL_MANUAL_HIDDEN_PROFILES,
+                                      nullptr, &netList) == ERROR_SUCCESS) {
+        for (DWORD j = 0; j < netList->dwNumberOfItems; j++) {
+          const WLAN_AVAILABLE_NETWORK& net = netList->Network[j];
+          std::string s(reinterpret_cast<const char*>(net.dot11Ssid.ucSSID),
+                        net.dot11Ssid.uSSIDLength);
+          securityMap[s] = ParseSecurity(net.dot11DefaultAuthAlgorithm,
+                                         net.dot11DefaultCipherAlgorithm);
+        }
+        WlanFreeMemory(netList);
+      }
+
+      // Iterate BSS entries for per-AP results with real RSSI
+      PWLAN_BSS_LIST bssList = nullptr;
+      if (WlanGetNetworkBssList(handle, &guid, nullptr, dot11_BSS_type_any,
+                                FALSE, nullptr, &bssList) != ERROR_SUCCESS) {
         continue;
       }
 
-      for (DWORD j = 0; j < netList->dwNumberOfItems; j++) {
+      for (DWORD j = 0; j < bssList->dwNumberOfItems; j++) {
         if (!scanning_) break;
 
-        const WLAN_AVAILABLE_NETWORK& net = netList->Network[j];
-        const DOT11_SSID& ssid = net.dot11Ssid;
+        const WLAN_BSS_ENTRY& bss = bssList->wlanBssEntries[j];
+        const DOT11_SSID& ssid = bss.dot11Ssid;
         std::string ssidStr(reinterpret_cast<const char*>(ssid.ucSSID), ssid.uSSIDLength);
         bool isHidden = ssid.uSSIDLength == 0;
 
-        WifiNetwork network(ssidStr, ParseSecurity(net.dot11DefaultAuthAlgorithm,
-                                                    net.dot11DefaultCipherAlgorithm),
-                            isHidden);
-        network.set_signal_dbm(static_cast<int64_t>(net.wlanSignalQuality));
+        auto it = securityMap.find(ssidStr);
+        WifiSecurity security = (it != securityMap.end()) ? it->second : WifiSecurity::kUnknown;
+
+        WifiNetwork network(ssidStr, security, isHidden);
+        network.set_signal_dbm(static_cast<int64_t>(bss.lRssi));
 
         ui_thread_->Post([this, network]() {
           events_->OnScanResult(network,
@@ -229,7 +250,7 @@ std::optional<FlutterError> LayrzWifiPlugin::StartScan() {
                                 [](const FlutterError&) {});
         });
       }
-      WlanFreeMemory(netList);
+      WlanFreeMemory(bssList);
     }
 
     WlanFreeMemory(ifList);
