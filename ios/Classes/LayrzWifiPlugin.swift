@@ -1,0 +1,66 @@
+import Flutter
+import UIKit
+import CoreLocation
+import NetworkExtension
+import SystemConfiguration.CaptiveNetwork
+
+public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
+  public static func register(with registrar: FlutterPluginRegistrar) {
+    let plugin = LayrzWifiPlugin()
+    LayrzWifiApiSetup.setUp(binaryMessenger: registrar.messenger(), api: plugin)
+  }
+
+  public func hasDiscovery() throws -> Bool { false }
+
+  public func hasCurrentSsid() throws -> Bool { true }
+
+  public func currentSsid() throws -> String? {
+    if #available(iOS 14.0, *) {
+      // NEHotspotNetwork.fetchCurrent requires the Access WiFi Information entitlement.
+      // This call is async; we bridge it synchronously via a semaphore because Pigeon
+      // currently generates synchronous HostApi methods.
+      var result: String? = nil
+      let semaphore = DispatchSemaphore(value: 0)
+      NEHotspotNetwork.fetchCurrent { network in
+        result = network?.ssid
+        semaphore.signal()
+      }
+      semaphore.wait()
+      return result
+    } else {
+      return legacyCopyCurrentSsid()
+    }
+  }
+
+  public func scan() throws -> [WifiNetwork] {
+    throw PigeonError(code: "UNSUPPORTED", message: "WiFi scan is not supported on iOS.", details: nil)
+  }
+
+  public func ensurePermissions() throws -> WifiPermissionStatus {
+    let status = CLLocationManager.authorizationStatus()
+    switch status {
+    case .authorizedAlways, .authorizedWhenInUse:
+      return .granted
+    case .denied:
+      return .denied
+    case .restricted:
+      return .restricted
+    case .notDetermined:
+      CLLocationManager().requestWhenInUseAuthorization()
+      return .denied
+    @unknown default:
+      return .denied
+    }
+  }
+
+  private func legacyCopyCurrentSsid() -> String? {
+    guard let interfaces = CNCopySupportedInterfaces() as? [String] else { return nil }
+    for interface in interfaces {
+      if let info = CNCopyCurrentNetworkInfo(interface as CFString) as NSDictionary?,
+         let ssid = info[kCNNetworkInfoKeySSID as String] as? String {
+        return ssid
+      }
+    }
+    return nil
+  }
+}

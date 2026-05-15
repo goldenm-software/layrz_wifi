@@ -1,0 +1,41 @@
+name: layrz_wifi
+description: "Flutter plugin to scan nearby WiFi networks and read the current SSID on Android, iOS, macOS, Windows, Linux, and Web."
+version: 0.1.0
+homepage: https://github.com/goldenm-software/layrz_wifi
+repository: https://github.com/goldenm-software/layrz_wifi
+issue_tracker: https://github.com/goldenm-software/layrz_wifi/issues
+
+environment:
+  sdk: ^3.11.5
+  flutter: '>=3.3.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
+  plugin_platform_interface: ^2.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  pigeon: ^22.7.4
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.goldenm.layrz_wifi
+        pluginClass: LayrzWifiPlugin
+      ios:
+        pluginClass: LayrzWifiPlugin
+      macos:
+        pluginClass: LayrzWifiPlugin
+      windows:
+        pluginClass: LayrzWifiPluginCApi
+      linux:
+        pluginClass: LayrzWifiPlugin
+      web:
+        pluginClass: LayrzWifiWeb
+        fileName: layrz_wifi_web.dart
