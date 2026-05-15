@@ -3,6 +3,7 @@
 
 #include <flutter/plugin_registrar_windows.h>
 #include "messages.g.h"
+#include "thread_handler.hpp"
 
 #include <atomic>
 #include <memory>
@@ -30,7 +31,7 @@ class LayrzWifiPlugin : public flutter::Plugin, public LayrzWifiApi {
  private:
   std::unique_ptr<LayrzWifiEvents> events_;
   std::atomic<bool> scanning_{false};
-  flutter::PluginRegistrarWindows* registrar_{nullptr};
+  std::unique_ptr<LayrzWifiPluginUiThreadHandler> ui_thread_;
 };
 
 }  // namespace layrz_wifi

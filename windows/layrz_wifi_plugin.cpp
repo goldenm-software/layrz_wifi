@@ -8,13 +8,10 @@
 #include <flutter/plugin_registrar_windows.h>
 
 #include <atomic>
-#include <codecvt>
-#include <locale>
 #include <memory>
 #include <optional>
 #include <string>
 #include <thread>
-#include <vector>
 
 #pragma comment(lib, "wlanapi.lib")
 #pragma comment(lib, "ole32.lib")
@@ -61,7 +58,7 @@ WifiSecurity ParseSecurity(DWORD auth, DWORD cipher) {
 void LayrzWifiPlugin::RegisterWithRegistrar(
     flutter::PluginRegistrarWindows *registrar) {
   auto plugin = std::make_unique<LayrzWifiPlugin>();
-  plugin->registrar_ = registrar;
+  plugin->ui_thread_ = std::make_unique<LayrzWifiPluginUiThreadHandler>(registrar);
   plugin->events_ = std::make_unique<LayrzWifiEvents>(registrar->messenger());
   LayrzWifiApi::SetUp(registrar->messenger(), plugin.get());
   registrar->AddPlugin(std::move(plugin));
@@ -69,7 +66,7 @@ void LayrzWifiPlugin::RegisterWithRegistrar(
 
 LayrzWifiPlugin::LayrzWifiPlugin() {}
 LayrzWifiPlugin::~LayrzWifiPlugin() {
-  scanning_ = false;  // Signal scan thread to stop if running
+  scanning_ = false;
 }
 
 ErrorOr<bool> LayrzWifiPlugin::HasDiscovery() { return true; }
@@ -125,7 +122,7 @@ std::optional<FlutterError> LayrzWifiPlugin::StartScan() {
     DWORD negVersion = 0;
     if (WlanOpenHandle(2, nullptr, &negVersion, &handle) != ERROR_SUCCESS) {
       if (scanning_.exchange(false)) {
-        registrar_->GetTaskRunner()->PostTask([this]() {
+        ui_thread_->Post([this]() {
           events_->OnScanError("Failed to open WLAN handle.",
                                []() {},
                                [](const FlutterError&) {});
@@ -137,7 +134,7 @@ std::optional<FlutterError> LayrzWifiPlugin::StartScan() {
     PWLAN_INTERFACE_INFO_LIST ifList = nullptr;
     if (WlanEnumInterfaces(handle, nullptr, &ifList) != ERROR_SUCCESS) {
       if (scanning_.exchange(false)) {
-        registrar_->GetTaskRunner()->PostTask([this]() {
+        ui_thread_->Post([this]() {
           events_->OnScanError("Failed to enumerate WLAN interfaces.",
                                []() {},
                                [](const FlutterError&) {});
@@ -190,7 +187,7 @@ std::optional<FlutterError> LayrzWifiPlugin::StartScan() {
 
     // Post OnScanComplete to the Flutter UI thread
     if (scanning_.exchange(false)) {
-      registrar_->GetTaskRunner()->PostTask([this]() {
+      ui_thread_->Post([this]() {
         events_->OnScanComplete(
             []() {},
             [](const FlutterError&) {});
