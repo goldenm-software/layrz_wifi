@@ -37,11 +37,11 @@ class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
             bssid: net.bssid,
             signalDbm: net.rssiValue != 0 ? Int64(net.rssiValue) : nil,
             frequencyMhz: net.wlanChannel.map { Int64($0.channelNumber) },
-            security: self.mapSecurity(net.security()),
+            security: self.mapSecurity(net),
             isHidden: net.ssid == nil || net.ssid!.isEmpty
           )
 
-          DispatchQueue.main.async {
+          DispatchQueue.main.async { [wifiNet] in
             self.events?.onScanResult(network: wifiNet) { _ in }
           }
         }
@@ -79,19 +79,18 @@ class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
     }
   }
 
-  private func mapSecurity(_ security: CWSecurity) -> WifiSecurity {
-    switch security {
-    case .none:
-      return .open
-    case .WEP:
-      return .wep
-    case .wpaPersonal, .wpaPersonalMixed, .wpaEnterprise, .wpaEnterpriseMixed:
-      return .wpa
-    case .wpa2Personal, .wpa2Enterprise:
-      return .wpa2
-    case .wpa3Personal, .wpa3Enterprise, .wpa3Transition:
+  private func mapSecurity(_ network: CWNetwork) -> WifiSecurity {
+    if network.supportsSecurity(.wpa3Personal) || network.supportsSecurity(.wpa3Enterprise) || network.supportsSecurity(.wpa3Transition) {
       return .wpa3
-    default:
+    } else if network.supportsSecurity(.wpa2Personal) || network.supportsSecurity(.wpa2Enterprise) {
+      return .wpa2
+    } else if network.supportsSecurity(.wpaPersonal) || network.supportsSecurity(.wpaPersonalMixed) || network.supportsSecurity(.wpaEnterprise) || network.supportsSecurity(.wpaEnterpriseMixed) {
+      return .wpa
+    } else if network.supportsSecurity(.WEP) {
+      return .wep
+    } else if network.supportsSecurity(.none) {
+      return .open
+    } else {
       return .unknown
     }
   }
