@@ -5,13 +5,18 @@ homepage: https://github.com/goldenm-software/layrz_wifi
 repository: https://github.com/goldenm-software/layrz_wifi
 issue_tracker: https://github.com/goldenm-software/layrz_wifi/issues
 
+topics:
+  - wifi
+  - network
+  - scan
+  - ssid
+  - flutter-plugin
+
 platforms:
   android:
-  ios:
   macos:
   windows:
   linux:
-  web:
 
 environment:
   sdk: ^3.11.5
