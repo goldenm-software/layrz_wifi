@@ -37,6 +37,7 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
   bool _scanning = false;
 
   StreamSubscription<WifiNetwork>? _scanSub;
+  StreamSubscription<WifiScanEvent>? _eventSub;
 
   @override
   void initState() {
@@ -47,6 +48,7 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
   @override
   void dispose() {
     _scanSub?.cancel();
+    _eventSub?.cancel();
     super.dispose();
   }
 
@@ -121,11 +123,25 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
 
     _scanSub = _wifi.scanResults.listen(
       (network) => setState(() => _networks.add(network)),
-      onError: (e) => setState(() {
-        _status = 'Scan error: $e';
-        _scanning = false;
-      }),
     );
+
+    _eventSub = _wifi.scanEvents.listen((event) {
+      if (event is WifiScanComplete) {
+        setState(() {
+          _scanning = false;
+          _status = 'Found ${_networks.length} networks';
+        });
+        _scanSub?.cancel();
+        _eventSub?.cancel();
+      } else if (event is WifiScanError) {
+        setState(() {
+          _scanning = false;
+          _status = 'Scan error: ${event.message}';
+        });
+        _scanSub?.cancel();
+        _eventSub?.cancel();
+      }
+    });
 
     try {
       await _wifi.startScan();
@@ -141,10 +157,12 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
   Future<void> _stopScan() async {
     await _wifi.stopScan();
     await _scanSub?.cancel();
+    await _eventSub?.cancel();
     _scanSub = null;
+    _eventSub = null;
     setState(() {
       _scanning = false;
-      _status = 'Found ${_networks.length} networks';
+      _status = 'Stopped — found ${_networks.length} networks';
     });
   }
 
