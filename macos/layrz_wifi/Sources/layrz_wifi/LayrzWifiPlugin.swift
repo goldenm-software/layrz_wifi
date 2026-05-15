@@ -2,24 +2,24 @@ import FlutterMacOS
 import CoreWLAN
 import CoreLocation
 
-public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
+class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
   var events: LayrzWifiEvents?
 
-  public static func register(with registrar: FlutterPluginRegistrar) {
+  static func register(with registrar: FlutterPluginRegistrar) {
     let plugin = LayrzWifiPlugin()
     plugin.events = LayrzWifiEvents(binaryMessenger: registrar.messenger)
     LayrzWifiApiSetup.setUp(binaryMessenger: registrar.messenger, api: plugin)
   }
 
-  public func hasDiscovery() throws -> Bool { true }
+  func hasDiscovery() throws -> Bool { true }
 
-  public func hasCurrentSsid() throws -> Bool { true }
+  func hasCurrentSsid() throws -> Bool { true }
 
-  public func currentSsid() throws -> String? {
+  func currentSsid() throws -> String? {
     return CWWiFiClient.shared().interface()?.ssid()
   }
 
-  public func startScan() throws {
+  func startScan() throws {
     DispatchQueue.global(qos: .userInitiated).async {
       do {
         guard let iface = CWWiFiClient.shared().interface() else {
@@ -57,12 +57,12 @@ public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
     }
   }
 
-  public func stopScan() throws {
+  func stopScan() throws {
     // CoreWLAN scan cannot be cancelled mid-call; the existing scan will complete
     // and fire onScanComplete naturally. This is a no-op.
   }
 
-  public func ensurePermissions() throws -> WifiPermissionStatus {
+  func ensurePermissions() throws -> WifiPermissionStatus {
     let status = CLLocationManager.authorizationStatus()
     switch status {
     case .authorizedAlways:

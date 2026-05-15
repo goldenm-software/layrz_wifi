@@ -4,20 +4,20 @@ import CoreLocation
 import NetworkExtension
 import SystemConfiguration.CaptiveNetwork
 
-public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
+class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
   var events: LayrzWifiEvents?
 
-  public static func register(with registrar: FlutterPluginRegistrar) {
+  static func register(with registrar: FlutterPluginRegistrar) {
     let plugin = LayrzWifiPlugin()
     plugin.events = LayrzWifiEvents(binaryMessenger: registrar.messenger())
     LayrzWifiApiSetup.setUp(binaryMessenger: registrar.messenger(), api: plugin)
   }
 
-  public func hasDiscovery() throws -> Bool { false }
+  func hasDiscovery() throws -> Bool { false }
 
-  public func hasCurrentSsid() throws -> Bool { true }
+  func hasCurrentSsid() throws -> Bool { true }
 
-  public func currentSsid() throws -> String? {
+  func currentSsid() throws -> String? {
     if #available(iOS 14.0, *) {
       // NEHotspotNetwork.fetchCurrent requires the Access WiFi Information entitlement.
       // This call is async; we bridge it synchronously via a semaphore because Pigeon
@@ -35,17 +35,17 @@ public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
     }
   }
 
-  public func startScan() throws {
+  func startScan() throws {
     DispatchQueue.main.async {
       self.events?.onScanError(message: "WiFi scan is not supported on iOS.") { _ in }
     }
   }
 
-  public func stopScan() throws {
+  func stopScan() throws {
     // No-op on iOS
   }
 
-  public func ensurePermissions() throws -> WifiPermissionStatus {
+  func ensurePermissions() throws -> WifiPermissionStatus {
     let status = CLLocationManager.authorizationStatus()
     switch status {
     case .authorizedAlways, .authorizedWhenInUse:
