@@ -1,8 +1,6 @@
 # layrz_wifi
 
-> 🤖 Generated using AI Assistance, you may find optimizations along the plugin, feel free to open a Pull Request.
-
-A Flutter plugin to scan nearby WiFi networks and read the currently connected SSID on Android, iOS, macOS, Windows, Linux, and Web.
+A Flutter plugin to scan nearby WiFi networks and read the currently connected SSID on Android, macOS, Windows, and Linux.
 
 All platform communication uses [Pigeon](https://pub.dev/packages/pigeon) for type-safe, generated channel code.
 
@@ -11,11 +9,11 @@ All platform communication uses [Pigeon](https://pub.dev/packages/pigeon) for ty
 | Platform | `hasDiscovery()` | `hasCurrentSsid()` | Notes |
 |---|:---:|:---:|---|
 | 🤖 Android | ✅ | ✅ | Requires `ACCESS_FINE_LOCATION` (API < 33) or `NEARBY_WIFI_DEVICES` (API 33+) |
-| 🍎 iOS | ❌ | ✅ | Requires **Access WiFi Information** entitlement + `NSLocationWhenInUseUsageDescription` |
-| 🍏 macOS | ✅ | ✅ | Requires `com.apple.developer.networking.wifi-info` entitlement + location authorization |
+| 🍎 iOS | ❌ | ❌ | No WiFi scan API available. `startScan` returns an error. |
+| 🍏 macOS | ✅ | ✅ | Requires `com.apple.developer.networking.wifi-info` entitlement + location permission |
 | 🪟 Windows | ✅ | ✅ | Uses `wlanapi.dll` — no special entitlement required |
 | 🐧 Linux | ✅ | ✅ | Requires `nmcli` (NetworkManager CLI) to be installed |
-| 🌐 Web | ❌ | ❌ | Browsers block all WiFi APIs — manual SSID entry only |
+| 🌐 Web | ❌ | ❌ | Browsers block all WiFi APIs |
 
 ## Quick start
 
@@ -28,10 +26,11 @@ final wifi = LayrzWifi.instance;
 final canScan = await wifi.hasDiscovery();
 final canReadSsid = await wifi.hasCurrentSsid();
 
-// Request permissions (required on Android and iOS)
-final perm = await wifi.ensurePermissions();
-if (perm != WifiPermissionStatus.granted && perm != WifiPermissionStatus.notRequired) {
-  // Show UI telling the user to grant permission
+// Request permissions before scanning
+final granted = await wifi.requestPermissions();
+if (!granted) {
+  final status = await wifi.permissionStatus();
+  print('Permission denied: $status');
   return;
 }
 
@@ -40,12 +39,19 @@ if (canReadSsid) {
   final ssid = await wifi.currentSsid(); // null if not connected
 }
 
-// Scan for nearby networks (not supported on iOS or Web)
+// Scan for nearby networks
 if (canScan) {
-  final List<WifiNetwork> networks = await wifi.scan();
-  for (final n in networks) {
-    print('${n.ssid} (${n.security.name}) ${n.signalDbm} dBm');
-  }
+  wifi.scanResults.listen((network) {
+    print('${network.ssid} (${network.security.name}) ${network.signalDbm} dBm');
+  });
+
+  wifi.scanEvents.listen((event) {
+    if (event is WifiScanComplete) print('Scan complete');
+    if (event is WifiScanError) print('Scan error: ${event.message}');
+  });
+
+  await wifi.startScan();
+  // Call stopScan() when done
 }
 ```
 
@@ -69,37 +75,33 @@ Add to `android/app/src/main/AndroidManifest.xml` inside `<manifest>`:
 <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
 ```
 
-The plugin declares these permissions in its own `AndroidManifest.xml`, which gets merged automatically.
-
 ### iOS
 
-1. Enable the **Access WiFi Information** capability for your app in Xcode (Signing & Capabilities tab) **and** on the Apple Developer portal for your App ID.
-2. Add to `ios/Runner/Info.plist`:
-
-```xml
-<key>NSLocationWhenInUseUsageDescription</key>
-<string>This app needs location access to read the WiFi network name.</string>
-```
-
-> **Note**: `hasDiscovery()` always returns `false` on iOS. WiFi scanning requires `NEHotspotHelper`, an Apple-gated MFi-tier entitlement that is not available for general distribution.
+iOS has no public WiFi scanning API. `hasDiscovery()` and `hasCurrentSsid()` both return `false`. The plugin is a no-op on iOS.
 
 ### macOS
 
-1. Enable **com.apple.developer.networking.wifi-info** in your macOS entitlements files (`DebugProfile.entitlements` and `Release.entitlements`):
+1. Add to `macos/Runner/DebugProfile.entitlements` and `Release.entitlements`:
 
 ```xml
 <key>com.apple.developer.networking.wifi-info</key>
+<true/>
+<key>com.apple.security.network.client</key>
+<true/>
+<key>com.apple.security.personal-information.location</key>
 <true/>
 ```
 
 2. Add to `macos/Runner/Info.plist`:
 
 ```xml
-<key>NSLocationUsageDescription</key>
-<string>This app needs location access to scan WiFi networks.</string>
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>Location access is required to scan for nearby Wi-Fi networks.</string>
+<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+<string>Location access is required to scan for nearby Wi-Fi networks.</string>
 ```
 
-3. Minimum deployment target: **macOS 10.15** (CoreWLAN scan requires location authorization since 10.15).
+3. Call `requestPermissions()` before scanning — the plugin will show the system location dialog on first call.
 
 ### Windows
 
@@ -114,15 +116,9 @@ sudo apt install network-manager  # Debian/Ubuntu
 sudo dnf install NetworkManager   # Fedora/RHEL
 ```
 
-The plugin shells out to `nmcli` for both scan and current SSID. A future version will use the D-Bus NetworkManager API directly.
-
 ### Web
 
-No setup. Both `hasDiscovery()` and `hasCurrentSsid()` return `false`. Show a manual text input instead.
-
-## Why can't I read the list of saved networks?
-
-Every modern OS (Android, iOS, macOS, Windows, Linux, and browsers) deliberately blocks third-party apps from reading the device's stored WiFi credentials and saved network list as a security and privacy measure. This plugin instead **scans nearby networks in real time** and reads the **currently connected SSID**, which covers the practical use case of picking a network from a list during device provisioning.
+No setup. Both `hasDiscovery()` and `hasCurrentSsid()` return `false`. Browsers block all WiFi APIs.
 
 ## API
 
@@ -133,8 +129,15 @@ class LayrzWifi {
   Future<bool> hasDiscovery();
   Future<bool> hasCurrentSsid();
   Future<String?> currentSsid();
-  Future<List<WifiNetwork>> scan();
-  Future<WifiPermissionStatus> ensurePermissions();
+
+  Future<bool> requestPermissions();
+  Future<WifiPermissionStatus> permissionStatus();
+
+  Stream<WifiNetwork> get scanResults;
+  Stream<WifiScanEvent> get scanEvents;
+
+  Future<void> startScan();
+  Future<void> stopScan();
 }
 
 class WifiNetwork {
@@ -144,6 +147,12 @@ class WifiNetwork {
   final int? frequencyMhz;
   final WifiSecurity security;
   final bool isHidden;
+}
+
+sealed class WifiScanEvent {}
+class WifiScanComplete extends WifiScanEvent {}
+class WifiScanError extends WifiScanEvent {
+  final String message;
 }
 
 enum WifiSecurity { open, wep, wpa, wpa2, wpa3, unknown }
@@ -158,7 +167,7 @@ After modifying `pigeons/messages.dart`:
 dart run pigeon --input pigeons/messages.dart
 ```
 
-Commit the regenerated `lib/src/messages.g.dart` and the native generated files.
+The Swift output goes to `darwin/layrz_wifi/Sources/layrz_wifi/Messages.g.swift` — no manual copying needed.
 
 ## License
 
