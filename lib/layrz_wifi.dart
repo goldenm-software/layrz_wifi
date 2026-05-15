@@ -47,8 +47,11 @@ class LayrzWifi implements LayrzWifiEvents {
     LayrzWifiEvents.setUp(null);
   }
 
-  /// Request WiFi permissions if needed.
-  Future<WifiPermissionStatus> ensurePermissions() => _api.ensurePermissions();
+  /// Request WiFi permissions. Returns true if granted or not required.
+  Future<bool> requestPermissions() => _api.requestPermissions();
+
+  /// Returns the current permission status without requesting.
+  Future<WifiPermissionStatus> permissionStatus() => _api.permissionStatus();
 
   // LayrzWifiEvents implementation
   @override

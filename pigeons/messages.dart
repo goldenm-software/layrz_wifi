@@ -45,7 +45,8 @@ abstract class LayrzWifiApi {
   String? currentSsid();
   void startScan();
   void stopScan();
-  WifiPermissionStatus ensurePermissions();
+  bool requestPermissions();
+  WifiPermissionStatus permissionStatus();
 }
 
 @FlutterApi()
