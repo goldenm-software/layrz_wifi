@@ -111,9 +111,9 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
     final allowed = await _requestPermission();
     if (!allowed) return;
 
-    final perm = await _wifi.ensurePermissions();
-    if (perm != WifiPermissionStatus.granted && perm != WifiPermissionStatus.notRequired) {
-      setState(() => _status = 'Plugin permission check failed: $perm');
+    final granted = await _wifi.requestPermissions();
+    if (!granted) {
+      setState(() => _status = 'Permission denied: ${await _wifi.permissionStatus()}');
       return;
     }
 
