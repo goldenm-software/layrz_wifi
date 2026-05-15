@@ -164,7 +164,8 @@ interface LayrzWifiApi {
   fun currentSsid(): String?
   fun startScan()
   fun stopScan()
-  fun ensurePermissions(): WifiPermissionStatus
+  fun requestPermissions(): Boolean
+  fun permissionStatus(): WifiPermissionStatus
 
   companion object {
     /** The codec used by LayrzWifiApi. */
@@ -253,11 +254,26 @@ interface LayrzWifiApi {
         }
       }
       run {
-        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.layrz_wifi.LayrzWifiApi.ensurePermissions$separatedMessageChannelSuffix", codec)
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.layrz_wifi.LayrzWifiApi.requestPermissions$separatedMessageChannelSuffix", codec)
         if (api != null) {
           channel.setMessageHandler { _, reply ->
             val wrapped: List<Any?> = try {
-              listOf(api.ensurePermissions())
+              listOf(api.requestPermissions())
+            } catch (exception: Throwable) {
+              wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.layrz_wifi.LayrzWifiApi.permissionStatus$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            val wrapped: List<Any?> = try {
+              listOf(api.permissionStatus())
             } catch (exception: Throwable) {
               wrapError(exception)
             }

@@ -78,6 +78,10 @@ class LayrzWifiPlugin : FlutterPlugin, ActivityAware, LayrzWifiApi,
   }
 
   override fun startScan() {
+    if (permissionStatus() != WifiPermissionStatus.GRANTED) {
+      mainHandler.post { events?.onScanError("Location permission is required to scan for WiFi networks.") {} }
+      return
+    }
     scanCancelled = false
     CoroutineScope(Dispatchers.IO).launch {
       try {
@@ -181,12 +185,12 @@ class LayrzWifiPlugin : FlutterPlugin, ActivityAware, LayrzWifiApi,
     }
   }
 
-  override fun ensurePermissions(): WifiPermissionStatus {
-    val activity = activityBinding?.activity ?: return WifiPermissionStatus.DENIED
+  override fun requestPermissions(): Boolean {
+    val activity = activityBinding?.activity ?: return false
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
       val status = ActivityCompat.checkSelfPermission(context, Manifest.permission.NEARBY_WIFI_DEVICES)
-      if (status == PackageManager.PERMISSION_GRANTED) return WifiPermissionStatus.GRANTED
+      if (status == PackageManager.PERMISSION_GRANTED) return true
       ActivityCompat.requestPermissions(
         activity,
         arrayOf(Manifest.permission.NEARBY_WIFI_DEVICES),
@@ -194,7 +198,7 @@ class LayrzWifiPlugin : FlutterPlugin, ActivityAware, LayrzWifiApi,
       )
     } else {
       val fineStatus = ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
-      if (fineStatus == PackageManager.PERMISSION_GRANTED) return WifiPermissionStatus.GRANTED
+      if (fineStatus == PackageManager.PERMISSION_GRANTED) return true
       ActivityCompat.requestPermissions(
         activity,
         arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
@@ -202,8 +206,19 @@ class LayrzWifiPlugin : FlutterPlugin, ActivityAware, LayrzWifiApi,
       )
     }
 
-    // Return denied synchronously — the caller should re-invoke after the system dialog.
-    return WifiPermissionStatus.DENIED
+    return false
+  }
+
+  override fun permissionStatus(): WifiPermissionStatus {
+    val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+      Manifest.permission.NEARBY_WIFI_DEVICES
+    else
+      Manifest.permission.ACCESS_FINE_LOCATION
+
+    return when (ActivityCompat.checkSelfPermission(context, permission)) {
+      PackageManager.PERMISSION_GRANTED -> WifiPermissionStatus.GRANTED
+      else -> WifiPermissionStatus.DENIED
+    }
   }
 
   override fun onRequestPermissionsResult(
