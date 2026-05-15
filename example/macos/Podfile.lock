@@ -1,21 +1,22 @@
 PODS:
   - FlutterMacOS (1.0.0)
   - layrz_wifi (0.1.0):
+    - Flutter
     - FlutterMacOS
 
 DEPENDENCIES:
   - FlutterMacOS (from `Flutter/ephemeral`)
-  - layrz_wifi (from `Flutter/ephemeral/.symlinks/plugins/layrz_wifi/macos`)
+  - layrz_wifi (from `Flutter/ephemeral/.symlinks/plugins/layrz_wifi/darwin`)
 
 EXTERNAL SOURCES:
   FlutterMacOS:
     :path: Flutter/ephemeral
   layrz_wifi:
-    :path: Flutter/ephemeral/.symlinks/plugins/layrz_wifi/macos
+    :path: Flutter/ephemeral/.symlinks/plugins/layrz_wifi/darwin
 
 SPEC CHECKSUMS:
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
-  layrz_wifi: 444d5714405c14a6383845d4f76b2fe873f99ed0
+  layrz_wifi: abcc31d5f2d530c63c45f788cd9c6c54e695ffb5
 
 PODFILE CHECKSUM: 1e95c36afbfd1cb6423ceca4de7a8e1b256fb6ac
 

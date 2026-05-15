@@ -15,10 +15,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      title: 'layrz_wifi example',
-      home: WifiDemoPage(),
-    );
+    return const MaterialApp(title: 'layrz_wifi example', home: WifiDemoPage());
   }
 }
 
@@ -84,9 +81,7 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
     if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) return true;
 
     final Permission permission = Platform.isAndroid
-        ? (await Permission.nearbyWifiDevices.isGranted
-            ? Permission.nearbyWifiDevices
-            : Permission.location)
+        ? (await Permission.nearbyWifiDevices.isGranted ? Permission.nearbyWifiDevices : Permission.location)
         : Permission.locationWhenInUse;
 
     var status = await permission.status;
@@ -113,7 +108,8 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
 
     final granted = await _wifi.requestPermissions();
     if (!granted) {
-      setState(() => _status = 'Permission denied: ${await _wifi.permissionStatus()}');
+      final status = await _wifi.permissionStatus();
+      setState(() => _status = 'Permission denied: $status');
       return;
     }
 
@@ -173,28 +169,24 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: ElevatedButton(
-                  onPressed: _scanning ? _stopScan : null,
-                  child: const Text('Stop Scan'),
-                ),
+                child: ElevatedButton(onPressed: _scanning ? _stopScan : null, child: const Text('Stop Scan')),
               ),
             ],
           ),
-          if (_scanning) ...[
-            const SizedBox(height: 8),
-            const LinearProgressIndicator(),
-          ],
+          if (_scanning) ...[const SizedBox(height: 8), const LinearProgressIndicator()],
           if (_status != null) ...[
             const SizedBox(height: 8),
             Text(_status!, style: const TextStyle(fontStyle: FontStyle.italic)),
           ],
           const SizedBox(height: 16),
-          ..._networks.map((n) => Card(
-                child: ListTile(
-                  title: Text(n.ssid.isEmpty ? '(hidden)' : n.ssid),
-                  subtitle: Text('${n.bssid ?? ''} · ${n.security.name} · ${n.signalDbm ?? '?'} dBm'),
-                ),
-              )),
+          ..._networks.map(
+            (n) => Card(
+              child: ListTile(
+                title: Text(n.ssid.isEmpty ? '(hidden)' : n.ssid),
+                subtitle: Text('${n.bssid ?? ''} · ${n.security.name} · ${n.signalDbm ?? '?'} dBm'),
+              ),
+            ),
+          ),
         ],
       ),
     );

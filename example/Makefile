@@ -94,3 +94,8 @@ plugin-test:
 clean:
 	flutter clean
 	flutter pub get
+
+.PHONY: pod
+pod:
+	$(MAKE) -C macos pod
+	$(MAKE) -C ios pod
