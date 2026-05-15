@@ -41,9 +41,11 @@ public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi, CLLocationM
       if #available(iOS 14.0, *) {
         var result: String? = nil
         let semaphore = DispatchSemaphore(value: 0)
-        NEHotspotNetwork.fetchCurrent { network in
-          result = network?.ssid
-          semaphore.signal()
+        DispatchQueue.global(qos: .userInitiated).async {
+          NEHotspotNetwork.fetchCurrent { network in
+            result = network?.ssid
+            semaphore.signal()
+          }
         }
         semaphore.wait()
         return result
