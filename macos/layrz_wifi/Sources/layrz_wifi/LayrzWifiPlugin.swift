@@ -76,7 +76,9 @@ public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
       return .restricted
     case .notDetermined:
       manager.requestAlwaysAuthorization()
-      return .denied
+      // Return notRequired so the caller proceeds; scanForNetworks will enforce
+      // the grant itself once the async dialog resolves.
+      return .notRequired
     @unknown default:
       return .denied
     }
