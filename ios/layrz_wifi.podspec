@@ -7,12 +7,12 @@ Pod::Spec.new do |s|
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'Golden M, Inc.' => 'kenny@goldenm.com' }
   s.source           = { :path => '.' }
-  s.source_files = 'Classes/**/*'
+  s.source_files = 'layrz_wifi/Sources/**/*.swift'
   s.dependency 'Flutter'
   s.platform = :ios, '14.0'
 
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386' }
   s.swift_version = '5.0'
 
-  s.resource_bundles = {'layrz_wifi_privacy' => ['Resources/PrivacyInfo.xcprivacy']}
+  s.resource_bundles = {'layrz_wifi_privacy' => ['layrz_wifi/Sources/layrz_wifi/PrivacyInfo.xcprivacy']}
 end
