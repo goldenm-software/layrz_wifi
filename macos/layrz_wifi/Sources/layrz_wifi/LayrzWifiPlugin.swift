@@ -68,14 +68,14 @@ public class LayrzWifiPlugin: NSObject, FlutterPlugin, LayrzWifiApi {
       status = CLLocationManager.authorizationStatus()
     }
     switch status {
-    case .authorizedAlways:
+    case .authorizedAlways, .authorized:
       return .granted
     case .denied:
       return .denied
     case .restricted:
       return .restricted
     case .notDetermined:
-      manager.requestAlwaysAuthorization()
+      // Don't request here — the app layer (permission_handler) owns the prompt.
       return .denied
     @unknown default:
       return .denied
