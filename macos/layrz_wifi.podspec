@@ -8,7 +8,7 @@ Pod::Spec.new do |s|
   s.author           = { 'Golden M, Inc.' => 'kenny@goldenm.com' }
 
   s.source           = { :path => '.' }
-  s.source_files = 'Classes/**/*'
+  s.source_files = 'Classes/**/*', '../ios/Classes/Messages.g.swift'
 
   s.resource_bundles = {'layrz_wifi_privacy' => ['Resources/PrivacyInfo.xcprivacy']}
 
