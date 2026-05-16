@@ -75,7 +75,10 @@ clean:
 .PHONY: tag
 tag:
 	@echo "Tagging the current commit with the version from pubspec.yaml..."
+	@git checkout main
+	@git pull
 	@VERSION=$$(grep 'version:' pubspec.yaml | head -n 1 | awk '{print $$2}' | cut -d+ -f1) && \
 	git tag -a "v$$VERSION" -m "Release v$$VERSION" && \
 	git push origin "v$$VERSION" && \
 	echo "Tagged with v$$VERSION"
+	@git checkout development
