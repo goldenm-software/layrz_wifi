@@ -39,6 +39,29 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
   StreamSubscription<WifiNetwork>? _scanSub;
   StreamSubscription<WifiScanEvent>? _eventSub;
 
+  String _networkKey(WifiNetwork network) {
+    final bssid = network.bssid?.trim();
+    if (bssid != null && bssid.isNotEmpty) return bssid;
+    return '${network.ssid}|${network.frequencyMhz ?? 0}';
+  }
+
+  void _upsertNetwork(WifiNetwork network) {
+    final key = _networkKey(network);
+    final index = _networks.indexWhere((existing) => _networkKey(existing) == key);
+
+    setState(() {
+      if (index >= 0) {
+        _networks[index] = network;
+      } else {
+        _networks.add(network);
+      }
+
+      if (_scanning) {
+        _status = 'Scanning... found ${_networks.length} networks';
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -122,12 +145,13 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
     setState(() {
       _scanning = true;
       _networks.clear();
-      _status = 'Scanning…';
+      _status = 'Scanning... found 0 networks';
     });
 
-    _scanSub = _wifi.scanResults.listen(
-      (network) => setState(() => _networks.add(network)),
-    );
+    await _scanSub?.cancel();
+    await _eventSub?.cancel();
+
+    _scanSub = _wifi.scanResults.listen(_upsertNetwork);
 
     _eventSub = _wifi.scanEvents.listen((event) {
       if (event is WifiScanComplete) {
@@ -137,6 +161,8 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
         });
         _scanSub?.cancel();
         _eventSub?.cancel();
+        _scanSub = null;
+        _eventSub = null;
       } else if (event is WifiScanError) {
         setState(() {
           _scanning = false;
@@ -144,6 +170,8 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
         });
         _scanSub?.cancel();
         _eventSub?.cancel();
+        _scanSub = null;
+        _eventSub = null;
       }
     });
 
@@ -154,7 +182,10 @@ class _WifiDemoPageState extends State<WifiDemoPage> {
         _status = 'Scan error: ${e.message}';
         _scanning = false;
       });
-      _scanSub?.cancel();
+      await _scanSub?.cancel();
+      await _eventSub?.cancel();
+      _scanSub = null;
+      _eventSub = null;
     }
   }
 
