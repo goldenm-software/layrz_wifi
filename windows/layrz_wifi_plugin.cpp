@@ -8,10 +8,13 @@
 #include <flutter/plugin_registrar_windows.h>
 
 #include <atomic>
+#include <iomanip>
 #include <memory>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <thread>
+#include <unordered_map>
 
 #pragma comment(lib, "wlanapi.lib")
 #pragma comment(lib, "ole32.lib")
@@ -50,6 +53,18 @@ WifiSecurity ParseSecurity(DWORD auth, DWORD cipher) {
     default:
       return WifiSecurity::kUnknown;
   }
+}
+
+std::string MacAddressToString(const DOT11_MAC_ADDRESS& mac) {
+  std::ostringstream stream;
+  stream << std::hex << std::setfill('0');
+  for (size_t i = 0; i < sizeof(DOT11_MAC_ADDRESS); ++i) {
+    if (i > 0) {
+      stream << ":";
+    }
+    stream << std::setw(2) << static_cast<int>(mac[i]);
+  }
+  return stream.str();
 }
 
 // Tracks pending scan completions across all interfaces on a single handle.
@@ -143,13 +158,14 @@ std::optional<FlutterError> LayrzWifiPlugin::StartScan() {
     return FlutterError("SCAN_IN_PROGRESS", "A scan is already in progress.");
   }
 
+  const uint64_t session = scan_session_.fetch_add(1) + 1;
   ResetEvent(cancel_event_);
 
-  std::thread([this]() {
+  std::thread([this, session]() {
     HANDLE handle = nullptr;
     DWORD negVersion = 0;
     if (WlanOpenHandle(2, nullptr, &negVersion, &handle) != ERROR_SUCCESS) {
-      if (scanning_.exchange(false)) {
+      if (scan_session_ == session && scanning_.exchange(false)) {
         ui_thread_->Post([this]() {
           events_->OnScanError("Failed to open WLAN handle.",
                                []() {},
@@ -161,7 +177,7 @@ std::optional<FlutterError> LayrzWifiPlugin::StartScan() {
 
     PWLAN_INTERFACE_INFO_LIST ifList = nullptr;
     if (WlanEnumInterfaces(handle, nullptr, &ifList) != ERROR_SUCCESS) {
-      if (scanning_.exchange(false)) {
+      if (scan_session_ == session && scanning_.exchange(false)) {
         ui_thread_->Post([this]() {
           events_->OnScanError("Failed to enumerate WLAN interfaces.",
                                []() {},
@@ -172,80 +188,109 @@ std::optional<FlutterError> LayrzWifiPlugin::StartScan() {
       return;
     }
 
-    // Register one notification handler for all interfaces on this handle
-    ScanCtx ctx;
-    ctx.event = CreateEvent(nullptr, TRUE, FALSE, nullptr);
-    ctx.pending = static_cast<LONG>(ifList->dwNumberOfItems);
+    while (scanning_ && scan_session_ == session) {
+      // Register one notification handler for all interfaces on this handle.
+      ScanCtx ctx;
+      ctx.event = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+      ctx.pending = 0;
 
-    WlanRegisterNotification(handle, WLAN_NOTIFICATION_SOURCE_ACM, TRUE,
-                             ScanNotifyCallback, &ctx, nullptr, nullptr);
+      WlanRegisterNotification(handle, WLAN_NOTIFICATION_SOURCE_ACM, TRUE,
+                               ScanNotifyCallback, &ctx, nullptr, nullptr);
 
-    // Trigger scan on all interfaces
-    for (DWORD i = 0; i < ifList->dwNumberOfItems; i++) {
-      if (!scanning_) break;
-      WlanScan(handle, &ifList->InterfaceInfo[i].InterfaceGuid,
-               nullptr, nullptr, nullptr);
-    }
-
-    // Wait for all interfaces to complete, cancel, or timeout (15s)
-    if (scanning_) {
-      HANDLE waits[] = { ctx.event, cancel_event_ };
-      WaitForMultipleObjects(2, waits, FALSE, 15000);
-    }
-
-    // Unregister before ctx goes out of scope
-    WlanRegisterNotification(handle, WLAN_NOTIFICATION_SOURCE_NONE, TRUE,
-                             nullptr, nullptr, nullptr, nullptr);
-    CloseHandle(ctx.event);
-
-    // Read results from all interfaces
-    for (DWORD i = 0; i < ifList->dwNumberOfItems; i++) {
-      if (!scanning_) break;
-
-      const GUID& guid = ifList->InterfaceInfo[i].InterfaceGuid;
-
-      PWLAN_AVAILABLE_NETWORK_LIST netList = nullptr;
-      if (WlanGetAvailableNetworkList(handle, &guid,
-                                      WLAN_AVAILABLE_NETWORK_INCLUDE_ALL_ADHOC_PROFILES |
-                                      WLAN_AVAILABLE_NETWORK_INCLUDE_ALL_MANUAL_HIDDEN_PROFILES,
-                                      nullptr, &netList) != ERROR_SUCCESS) {
-        continue;
+      // Trigger a scan on every interface that accepts it.
+      for (DWORD i = 0; i < ifList->dwNumberOfItems; i++) {
+        if (!scanning_ || scan_session_ != session) break;
+        if (WlanScan(handle, &ifList->InterfaceInfo[i].InterfaceGuid,
+                     nullptr, nullptr, nullptr) == ERROR_SUCCESS) {
+          InterlockedIncrement(&ctx.pending);
+        }
       }
 
-      for (DWORD j = 0; j < netList->dwNumberOfItems; j++) {
-        if (!scanning_) break;
-
-        const WLAN_AVAILABLE_NETWORK& net = netList->Network[j];
-        const DOT11_SSID& ssid = net.dot11Ssid;
-
-        // Skip hidden networks (empty SSID)
-        if (ssid.uSSIDLength == 0) continue;
-
-        std::string ssidStr(reinterpret_cast<const char*>(ssid.ucSSID), ssid.uSSIDLength);
-
-        WifiNetwork network(ssidStr, ParseSecurity(net.dot11DefaultAuthAlgorithm,
-                                                    net.dot11DefaultCipherAlgorithm),
-                            false);
-        network.set_signal_dbm(static_cast<int64_t>(net.wlanSignalQuality));
-
-        ui_thread_->Post([this, network]() {
-          events_->OnScanResult(network,
-                                []() {},
-                                [](const FlutterError&) {});
-        });
+      // Wait for scan notifications, cancellation, or timeout.
+      if (scanning_ && scan_session_ == session && ctx.pending > 0) {
+        HANDLE waits[] = {ctx.event, cancel_event_};
+        WaitForMultipleObjects(2, waits, FALSE, 15000);
       }
-      WlanFreeMemory(netList);
+
+      WlanRegisterNotification(handle, WLAN_NOTIFICATION_SOURCE_NONE, TRUE,
+                               nullptr, nullptr, nullptr, nullptr);
+      CloseHandle(ctx.event);
+
+      if (!scanning_ || scan_session_ != session) {
+        break;
+      }
+
+      // Read the latest results from every interface after each scan pass.
+      for (DWORD i = 0; i < ifList->dwNumberOfItems; i++) {
+        if (!scanning_ || scan_session_ != session) break;
+
+        const GUID& guid = ifList->InterfaceInfo[i].InterfaceGuid;
+
+        std::unordered_map<std::string, WifiSecurity> security_map;
+        PWLAN_AVAILABLE_NETWORK_LIST netList = nullptr;
+        if (WlanGetAvailableNetworkList(handle, &guid,
+                                        WLAN_AVAILABLE_NETWORK_INCLUDE_ALL_ADHOC_PROFILES |
+                                        WLAN_AVAILABLE_NETWORK_INCLUDE_ALL_MANUAL_HIDDEN_PROFILES,
+                                        nullptr, &netList) == ERROR_SUCCESS) {
+          for (DWORD j = 0; j < netList->dwNumberOfItems; j++) {
+            const WLAN_AVAILABLE_NETWORK& net = netList->Network[j];
+            std::string ssid(reinterpret_cast<const char*>(net.dot11Ssid.ucSSID),
+                             net.dot11Ssid.uSSIDLength);
+            security_map[ssid] = ParseSecurity(net.dot11DefaultAuthAlgorithm,
+                                               net.dot11DefaultCipherAlgorithm);
+          }
+          WlanFreeMemory(netList);
+        }
+
+        PWLAN_BSS_LIST bssList = nullptr;
+        if (WlanGetNetworkBssList(handle, &guid, nullptr, dot11_BSS_type_any,
+                                  FALSE, nullptr, &bssList) != ERROR_SUCCESS) {
+          continue;
+        }
+
+        for (DWORD j = 0; j < bssList->dwNumberOfItems; j++) {
+          if (!scanning_ || scan_session_ != session) break;
+
+          const WLAN_BSS_ENTRY& bss = bssList->wlanBssEntries[j];
+          const DOT11_SSID& ssid = bss.dot11Ssid;
+          if (ssid.uSSIDLength == 0) continue;
+
+          std::string ssidStr(reinterpret_cast<const char*>(ssid.ucSSID), ssid.uSSIDLength);
+          auto security_it = security_map.find(ssidStr);
+          WifiSecurity security = security_it != security_map.end()
+              ? security_it->second
+              : WifiSecurity::kUnknown;
+
+          WifiNetwork network(ssidStr, security, false);
+          network.set_bssid(MacAddressToString(bss.dot11Bssid));
+          network.set_signal_dbm(static_cast<int64_t>(bss.lRssi));
+          if (bss.ulChCenterFrequency > 0) {
+            network.set_frequency_mhz(static_cast<int64_t>(bss.ulChCenterFrequency / 1000));
+          }
+
+          ui_thread_->Post([this, network, session]() {
+            if (scan_session_ != session || !scanning_) {
+              return;
+            }
+            events_->OnScanResult(network,
+                                  []() {},
+                                  [](const FlutterError&) {});
+          });
+        }
+        WlanFreeMemory(bssList);
+      }
+
+      if (scanning_ && scan_session_ == session &&
+          WaitForSingleObject(cancel_event_, 1500) == WAIT_OBJECT_0) {
+        break;
+      }
     }
 
     WlanFreeMemory(ifList);
     WlanCloseHandle(handle, nullptr);
 
-    if (scanning_.exchange(false)) {
-      ui_thread_->Post([this]() {
-        events_->OnScanComplete(
-            []() {},
-            [](const FlutterError&) {});
-      });
+    if (scan_session_ == session) {
+      scanning_ = false;
     }
   }).detach();
 
@@ -253,7 +298,11 @@ std::optional<FlutterError> LayrzWifiPlugin::StartScan() {
 }
 
 std::optional<FlutterError> LayrzWifiPlugin::StopScan() {
+  if (!scanning_) {
+    return std::nullopt;
+  }
   scanning_ = false;
+  scan_session_.fetch_add(1);
   SetEvent(cancel_event_);
   return std::nullopt;
 }

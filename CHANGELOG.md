@@ -1,3 +1,9 @@
+# Changelog
+
+## 1.0.1
+
+- Fixes on Windows, now it really scans for WiFi networks instead of just returning an empty list.
+
 ## 1.0.0
 
 - Replace blocking `scan()` with async `startScan()` / `stopScan()` and a `scanResults` broadcast stream for progressive per-network callbacks.

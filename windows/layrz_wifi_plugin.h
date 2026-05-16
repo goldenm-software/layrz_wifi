@@ -7,6 +7,7 @@
 #include "thread_handler.hpp"
 
 #include <atomic>
+#include <cstdint>
 #include <memory>
 
 namespace layrz_wifi {
@@ -32,6 +33,7 @@ class LayrzWifiPlugin : public flutter::Plugin, public LayrzWifiApi {
  private:
   std::unique_ptr<LayrzWifiEvents> events_;
   std::atomic<bool> scanning_{false};
+  std::atomic<uint64_t> scan_session_{0};
   std::unique_ptr<LayrzWifiPluginUiThreadHandler> ui_thread_;
   HANDLE cancel_event_{nullptr};
 };
