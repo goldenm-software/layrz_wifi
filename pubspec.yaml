@@ -1,6 +1,6 @@
 name: layrz_wifi
 description: "Flutter plugin to scan nearby WiFi networks and read the current SSID on Android, iOS, macOS, Windows, Linux, and Web."
-version: 1.0.1
+version: 1.1.0
 homepage: https://github.com/goldenm-software/layrz_wifi
 repository: https://github.com/goldenm-software/layrz_wifi
 issue_tracker: https://github.com/goldenm-software/layrz_wifi/issues
